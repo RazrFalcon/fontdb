@@ -1,0 +1,21 @@
+[package]
+name = "fontdb"
+version = "0.1.0"
+authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
+edition = "2018"
+description = "A simple, in-memory font database with CSS-like queries."
+documentation = "https://docs.rs/fontdb/"
+readme = "README.md"
+repository = "https://github.com/RazrFalcon/fontdb"
+license = "MIT"
+keywords = ["svg"]
+categories = ["font", "db", "css"]
+
+[dependencies]
+log = "0.4"
+memmap2 = "0.1"
+ttf-parser = "0.6.1"
+uuid = { version = "0.8", features = ["v4"] }
+
+[dev-dependencies]
+env_logger = { version = "0.7", default-features = false }
