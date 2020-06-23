@@ -15,6 +15,7 @@ fn main() {
     const FAMILY_NAME: &str = "Times New Roman";
     let query = fontdb::Query {
         families: &[fontdb::Family::Name(FAMILY_NAME), fontdb::Family::SansSerif],
+        weight: fontdb::Weight::BOLD,
         ..fontdb::Query::default()
     };
 

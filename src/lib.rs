@@ -387,6 +387,11 @@ pub struct FaceInfo {
 
     /// Face properties.
     pub properties: FaceProperties,
+
+    /// Indicates that this font face is variable.
+    ///
+    /// https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview
+    pub variable: bool,
 }
 
 
@@ -551,6 +556,7 @@ fn parse_face_info(
         index,
         family,
         properties,
+        variable: font.is_variable(),
     })
 }
 
