@@ -332,6 +332,8 @@ impl Database {
     ///
     /// In case of `Source::File`, the font file will be memory mapped.
     ///
+    /// Returns `None` when font file loading failed.
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -513,6 +515,7 @@ pub enum Style {
 }
 
 impl Default for Style {
+    #[inline]
     fn default() -> Style {
         Style::Normal
     }
@@ -551,26 +554,26 @@ fn parse_face_info(
 }
 
 fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
-    // *Typographic Family* is preferred over *Family*.
-    let mut idx = None;
-    let mut iter = font.names();
-    for (i, name) in iter.enumerate() {
-        if name.name_id() == ttf_parser::name_id::TYPOGRAPHIC_FAMILY {
+    // 'Typographic Family' is preferred over 'Family'.
+    let mut name_record = None;
+    for name in font.names() {
+        if name.name_id() == ttf_parser::name_id::TYPOGRAPHIC_FAMILY && name.is_supported_encoding() {
             // Break the loop as soon as we reached 'Typographic Family'.
-            idx = Some(i);
+            name_record = Some(name);
             break;
-        } else if name.name_id() == ttf_parser::name_id::FAMILY {
-            idx = Some(i);
+        } else if name.name_id() == ttf_parser::name_id::FAMILY && name.is_supported_encoding() {
+            name_record = Some(name);
             // Do not break the loop since 'Typographic Family' can be set later
             // and it has a higher priority.
         }
     }
 
-    let name_record = iter.nth(idx?)?;
+    let name_record = name_record?;
     let platform_id = name_record.platform_id()?;
     let encoding_id = name_record.encoding_id();
 
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
+    const WINDOWS_SYMBOL_ENCODING_ID: u16 = 0;
     const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
 
     // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
@@ -578,13 +581,16 @@ fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
 
     let is_unicode = match platform_id {
         ttf_parser::PlatformId::Unicode => true,
-        ttf_parser::PlatformId::Windows if encoding_id == WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+        ttf_parser::PlatformId::Windows => match encoding_id {
+            WINDOWS_SYMBOL_ENCODING_ID |
+            WINDOWS_UNICODE_BMP_ENCODING_ID => true,
+            _ => false,
+        }
         _ => false,
     };
 
     if is_unicode {
-        // TODO: use ttf_parser::Stream later
-        font.family_name()
+        name_record.name_utf8()
     } else if platform_id == ttf_parser::PlatformId::Macintosh &&
               encoding_id == MACINTOSH_ROMAN_ENCODING_ID
     {
@@ -599,6 +605,33 @@ fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
         None
     }
 }
+
+trait NameExt {
+    fn is_mac_roman(&self) -> bool;
+    fn is_supported_encoding(&self) -> bool;
+}
+
+impl NameExt for ttf_parser::Name<'_> {
+    #[inline]
+    fn is_mac_roman(&self) -> bool {
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
+        const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
+
+        let platform_id = match self.platform_id() {
+            Some(id) => id,
+            None => return false,
+        };
+
+           platform_id == ttf_parser::PlatformId::Macintosh
+        && self.encoding_id() == MACINTOSH_ROMAN_ENCODING_ID
+    }
+
+    #[inline]
+    fn is_supported_encoding(&self) -> bool {
+        self.is_unicode() || self.is_mac_roman()
+    }
+}
+
 
 // https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-style-matching
 // Based on https://github.com/servo/font-kit

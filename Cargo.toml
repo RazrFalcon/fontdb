@@ -14,7 +14,7 @@ categories = ["font", "db", "css"]
 [dependencies]
 log = "0.4"
 memmap2 = "0.1"
-ttf-parser = "0.6.1"
+ttf-parser = { git = "https://github.com/RazrFalcon/ttf-parser", rev = "df046dd" }
 uuid = { git = "https://github.com/uuid-rs/uuid", rev = "9bb93b6", features = ["v4"] }
 
 [dev-dependencies]
