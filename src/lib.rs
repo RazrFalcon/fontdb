@@ -336,7 +336,7 @@ impl Database {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// let is_variable = db.with_font_data(id, |font_data, face_index| {
     ///     let font = ttf_parser::Font::from_data(font_data, face_index).unwrap();
     ///     font.is_variable()
