@@ -74,7 +74,7 @@ pub struct ID(Uuid);
 
 /// A list of possible font loading errors.
 #[derive(Debug)]
-pub enum LoadError {
+enum LoadError {
     /// A malformed font.
     ///
     /// Typically means that [ttf-parser](https://github.com/RazrFalcon/ttf-parser)
@@ -132,7 +132,7 @@ impl Database {
     /// Loads a font data into the `Database`.
     ///
     /// Will load all font faces in case of a font collection.
-    pub fn load_font_data(&mut self, data: Vec<u8>) -> Result<(), LoadError> {
+    pub fn load_font_data(&mut self, data: Vec<u8>) {
         let source = Rc::new(Source::Binary(data));
 
         // Borrow `source` data.
@@ -143,26 +143,31 @@ impl Database {
 
         let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
         for index in 0..n {
-            let info = parse_face_info(source.clone(), &data, index)?;
-            self.faces.push(info);
+            match parse_face_info(source.clone(), &data, index) {
+                Ok(info) => self.faces.push(info),
+                Err(e) => warn!("Failed to load a font face {} from data cause {}.", index, e),
+            }
         }
-
-        Ok(())
     }
 
     /// Loads a font file into the `Database`.
     ///
     /// Will load all font faces in case of a font collection.
-    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), LoadError> {
+    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
         let source = Rc::new(Source::File(path.as_ref().into()));
 
-        let file = std::fs::File::open(path)?;
+        let file = std::fs::File::open(path.as_ref())?;
         let data = unsafe { memmap2::MmapOptions::new().map(&file)? };
 
         let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
         for index in 0..n {
-            let info = parse_face_info(source.clone(), &data, index)?;
-            self.faces.push(info);
+            match parse_face_info(source.clone(), &data, index) {
+                Ok(info) => self.faces.push(info),
+                Err(e) => {
+                    warn!("Failed to load a font face {} from '{}' cause {}.",
+                          index, path.as_ref().display(), e)
+                }
+            }
         }
 
         Ok(())
