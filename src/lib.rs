@@ -292,13 +292,14 @@ impl Database {
     }
 
     fn family_name<'a>(&'a self, family: &'a Family) -> Option<&'a str> {
+        use std::ops::Deref;
         match family {
             Family::Name(ref name) => Some(name),
-            Family::Serif => self.family_serif.as_deref(),
-            Family::SansSerif => self.family_sans_serif.as_deref(),
-            Family::Cursive => self.family_cursive.as_deref(),
-            Family::Fantasy => self.family_fantasy.as_deref(),
-            Family::Monospace => self.family_monospace.as_deref(),
+            Family::Serif => self.family_serif.as_ref().map(|t| t.deref()),
+            Family::SansSerif => self.family_sans_serif.as_ref().map(|t| t.deref()),
+            Family::Cursive => self.family_cursive.as_ref().map(|t| t.deref()),
+            Family::Fantasy => self.family_fantasy.as_ref().map(|t| t.deref()),
+            Family::Monospace => self.family_monospace.as_ref().map(|t| t.deref()),
         }
     }
 
