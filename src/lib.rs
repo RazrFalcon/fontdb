@@ -3,27 +3,23 @@
 
 # Features
 
-- The database can load fonts from files, directories or raw data (`Vec<u8>`).
+- The database can load fonts from files, directories and raw data (`Vec<u8>`).
 - The database can match a font using CSS-like queries. See `Database::query`.
 
 # Non-goals
 
-- System fonts loading.
-
+- System fonts loading.<br>
   This library is intentionally doesn't load system fonts.
   This is a very complex feature and should be handled by the caller or other libraries.
 
-- Font properties querying.
-
+- Font properties querying.<br>
   The database provides only storage and matching capabilities.
   For font properties querying you can use [ttf-parser].
 
-- A font fallback mechanism.
-
+- A font fallback mechanism.<br>
   This library can be used to implement a font fallback mechanism, but it doesn't implement it.
 
-- Application's global database.
-
+- Application's global database.<br>
   The database doesn't use `static`, therefore it's up to the caller where it should be stored.
 
 - Font types support other than TrueType.
@@ -302,6 +298,8 @@ impl Database {
     }
 
     /// Returns a reference to an internal storage.
+    ///
+    /// This can be used for manual font matching.
     #[inline]
     pub fn faces(&self) -> &[FaceInfo] {
         &self.faces
@@ -539,7 +537,7 @@ fn parse_face_info(
     let properties = FaceProperties { style, weight, stretch };
 
     Ok(FaceInfo {
-        id: ID(Uuid::new_v4()),
+        id: ID(Uuid::new_v4().unwrap()),
         source,
         index,
         family,
