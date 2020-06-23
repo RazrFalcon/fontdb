@@ -576,31 +576,10 @@ fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
     }
 
     let name_record = name_record?;
-    let platform_id = name_record.platform_id()?;
-    let encoding_id = name_record.encoding_id();
 
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-encoding-ids
-    const WINDOWS_SYMBOL_ENCODING_ID: u16 = 0;
-    const WINDOWS_UNICODE_BMP_ENCODING_ID: u16 = 1;
-
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
-    const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
-
-    let is_unicode = match platform_id {
-        ttf_parser::PlatformId::Unicode => true,
-        ttf_parser::PlatformId::Windows => match encoding_id {
-            WINDOWS_SYMBOL_ENCODING_ID |
-            WINDOWS_UNICODE_BMP_ENCODING_ID => true,
-            _ => false,
-        }
-        _ => false,
-    };
-
-    if is_unicode {
+    if name_record.is_unicode() {
         name_record.name_utf8()
-    } else if platform_id == ttf_parser::PlatformId::Macintosh &&
-              encoding_id == MACINTOSH_ROMAN_ENCODING_ID
-    {
+    } else if name_record.is_mac_roman() {
         // We support only MacRoman encoding here, which should be enough in most cases.
         let mut raw_data = Vec::with_capacity(name_record.name().len());
         for b in name_record.name() {
