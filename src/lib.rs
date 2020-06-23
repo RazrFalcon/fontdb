@@ -276,9 +276,13 @@ impl Database {
 
             let mut ids = Vec::new();
             let mut candidates = Vec::new();
-            for item in self.faces.iter().filter(|font| &font.family == name) {
-                ids.push(item.id);
-                candidates.push(item.properties);
+            for face in self.faces.iter().filter(|font| &font.family == name) {
+                ids.push(face.id);
+                candidates.push(FaceProperties {
+                    style: face.style,
+                    weight: face.weight,
+                    stretch: face.stretch,
+                });
             }
 
             if !candidates.is_empty() {
@@ -385,8 +389,14 @@ pub struct FaceInfo {
     /// Corresponds to a *Typographic Family* or a *Family* in the TrueType font.
     pub family: String,
 
-    /// Face properties.
-    pub properties: FaceProperties,
+    /// A font face style.
+    pub style: Style,
+
+    /// A font face weight.
+    pub weight: Weight,
+
+    /// A font face stretch.
+    pub stretch: Stretch,
 
     /// Indicates that this font face is variable.
     ///
@@ -395,15 +405,12 @@ pub struct FaceInfo {
 }
 
 
-/// Common face properties.
+/// CSS-related face properties.
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
-pub struct FaceProperties {
-    /// A font style.
-    pub style: Style,
-    /// A font weight.
-    pub weight: Weight,
-    /// A font stretch.
-    pub stretch: Stretch,
+struct FaceProperties {
+    style: Style,
+    weight: Weight,
+    stretch: Stretch,
 }
 
 
@@ -545,17 +552,14 @@ fn parse_face_info(
         Style::Normal
     };
 
-    let weight = Weight(font.weight().to_number());
-    let stretch = font.width();
-
-    let properties = FaceProperties { style, weight, stretch };
-
     Ok(FaceInfo {
         id: ID(Uuid::new_v4().unwrap()),
         source,
         index,
         family,
-        properties,
+        style,
+        weight: Weight(font.weight().to_number()),
+        stretch: font.width(),
         variable: font.is_variable(),
     })
 }
