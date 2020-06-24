@@ -158,11 +158,11 @@ impl Database {
         let source = Rc::new(Source::File(path.as_ref().into()));
 
         let file = std::fs::File::open(path.as_ref())?;
-        let data = unsafe { memmap2::MmapOptions::new().map(&file)? };
+        let data = unsafe { &memmap2::MmapOptions::new().map(&file)? };
 
-        let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+        let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
-            match parse_face_info(source.clone(), &data, index) {
+            match parse_face_info(source.clone(), data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => {
                     warn!("Failed to load a font face {} from '{}' cause {}.",
@@ -355,8 +355,8 @@ impl Database {
         match &*src {
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
-                let mmap = unsafe { memmap2::MmapOptions::new().map(&file).ok()? };
-                Some(p(&mmap, face_index))
+                let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+                Some(p(data, face_index))
             }
             Source::Binary(ref data) => {
                 Some(p(data, face_index))
