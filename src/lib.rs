@@ -5,6 +5,7 @@
 
 - The database can load fonts from files, directories and raw data (`Vec<u8>`).
 - The database can match a font using CSS-like queries. See `Database::query`.
+- Provides a unique ID for each font face.
 
 # Non-goals
 
