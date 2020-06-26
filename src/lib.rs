@@ -277,7 +277,7 @@ impl Database {
 
             let mut ids = Vec::new();
             let mut candidates = Vec::new();
-            for face in self.faces.iter().filter(|font| &font.family == name) {
+            for face in self.faces.iter().filter(|face| &face.family == name) {
                 ids.push(face.id);
                 candidates.push(FaceProperties {
                     style: face.style,
@@ -387,7 +387,9 @@ pub struct FaceInfo {
 
     /// A family name.
     ///
-    /// Corresponds to a *Typographic Family* or a *Family* in the TrueType font.
+    /// Corresponds to a *Font Family* (1) [name ID] in a TrueType font.
+    ///
+    /// [name ID]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
     pub family: String,
 
     /// A font face style.
@@ -566,21 +568,9 @@ fn parse_face_info(
 }
 
 fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
-    // 'Typographic Family' is preferred over 'Family'.
-    let mut name_record = None;
-    for name in font.names() {
-        if name.name_id() == ttf_parser::name_id::TYPOGRAPHIC_FAMILY && name.is_supported_encoding() {
-            // Break the loop as soon as we reached 'Typographic Family'.
-            name_record = Some(name);
-            break;
-        } else if name.name_id() == ttf_parser::name_id::FAMILY && name.is_supported_encoding() {
-            name_record = Some(name);
-            // Do not break the loop since 'Typographic Family' can be set later
-            // and it has a higher priority.
-        }
-    }
-
-    let name_record = name_record?;
+    let name_record = font.names().find(|name| {
+        name.name_id() == ttf_parser::name_id::FAMILY && name.is_supported_encoding()
+    })?;
 
     if name_record.is_unicode() {
         name_record.name_utf8()
