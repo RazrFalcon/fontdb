@@ -106,7 +106,7 @@ impl std::fmt::Display for LoadError {
 
 
 /// A font database.
-#[allow(missing_debug_implementations)]
+#[derive(Clone, Debug)]
 pub struct Database {
     faces: Vec<FaceInfo>,
     family_serif: Option<String>,
