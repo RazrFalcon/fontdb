@@ -59,7 +59,7 @@ But we do not keep such files open forever. Instead, we are memory-mapping files
 #![warn(missing_copy_implementations)]
 
 #[cfg(feature = "fs")] use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use uuid::Uuid;
 use log::warn;
@@ -134,7 +134,7 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        let source = Rc::new(Source::Binary(data));
+        let source = Arc::new(Source::Binary(data));
 
         // Borrow `source` data.
         let data = match &*source {
@@ -157,7 +157,7 @@ impl Database {
     /// Will load all font faces in case of a font collection.
     #[cfg(feature = "fs")]
     pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
-        let source = Rc::new(Source::File(path.as_ref().into()));
+        let source = Arc::new(Source::File(path.as_ref().into()));
 
         let file = std::fs::File::open(path.as_ref())?;
         let data = unsafe { &memmap2::MmapOptions::new().map(&file)? };
@@ -328,7 +328,7 @@ impl Database {
     }
 
     /// Returns font face storage and the face index by `ID`.
-    pub fn face_source(&self, id: ID) -> Option<(Rc<Source>, u32)> {
+    pub fn face_source(&self, id: ID) -> Option<(Arc<Source>, u32)> {
         self.face(id).map(|info| (info.source.clone(), info.index))
     }
 
@@ -384,7 +384,7 @@ pub struct FaceInfo {
     ///
     /// We have to use `Rc`, because multiple `FaceInfo` objects can reference
     /// the same data in case of font collections.
-    pub source: Rc<Source>,
+    pub source: Arc<Source>,
 
     /// A face index in the `source`.
     pub index: u32,
@@ -545,7 +545,7 @@ impl Default for Style {
 
 
 fn parse_face_info(
-    source: Rc<Source>,
+    source: Arc<Source>,
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
