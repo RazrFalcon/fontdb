@@ -58,7 +58,7 @@ But we do not keep such files open forever. Instead, we are memory-mapping files
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
 
-use std::path::{Path, PathBuf};
+#[cfg(feature = "fs")] use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use uuid::Uuid;
@@ -139,6 +139,7 @@ impl Database {
         // Borrow `source` data.
         let data = match &*source {
             Source::Binary(ref data) => data,
+            #[cfg(feature = "fs")]
             Source::File(_) => unreachable!(),
         };
 
@@ -154,6 +155,7 @@ impl Database {
     /// Loads a font file into the `Database`.
     ///
     /// Will load all font faces in case of a font collection.
+    #[cfg(feature = "fs")]
     pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
         let source = Rc::new(Source::File(path.as_ref().into()));
 
@@ -182,6 +184,7 @@ impl Database {
     ///
     /// Unlike other `load_*` methods, this one doesn't return an error.
     /// It will simply skip malformed fonts and will print a warning into the log for each of them.
+    #[cfg(feature = "fs")]
     pub fn load_fonts_dir<P: AsRef<Path>>(&mut self, dir: P) {
         let fonts_dir = match std::fs::read_dir(dir.as_ref()) {
             Ok(dir) => dir,
@@ -353,6 +356,7 @@ impl Database {
     {
         let (src, face_index) = self.face_source(id)?;
         match &*src {
+            #[cfg(feature = "fs")]
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
                 let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
@@ -426,7 +430,9 @@ struct FaceProperties {
 pub enum Source {
     /// A font's raw data. Owned by the database.
     Binary(Vec<u8>),
+
     /// A font's path.
+    #[cfg(feature = "fs")]
     File(PathBuf),
 }
 
