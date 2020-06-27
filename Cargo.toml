@@ -8,8 +8,8 @@ documentation = "https://docs.rs/fontdb/"
 readme = "README.md"
 repository = "https://github.com/RazrFalcon/fontdb"
 license = "MIT"
-keywords = ["svg"]
-categories = ["font", "db", "css"]
+keywords = ["font", "db", "css", "truetype", "ttf"]
+categories = ["text-processing"]
 
 [dependencies]
 log = "0.4"
