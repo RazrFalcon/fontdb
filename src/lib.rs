@@ -557,7 +557,7 @@ fn parse_face_info(
     };
 
     Ok(FaceInfo {
-        id: ID(Uuid::new_v4().unwrap()),
+        id: ID(Uuid::new_v4()),
         source,
         index,
         family,

@@ -14,8 +14,8 @@ categories = ["text-processing"]
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.1", optional = true }
-ttf-parser = { git = "https://github.com/RazrFalcon/ttf-parser", rev = "df046dd" }
-uuid = { git = "https://github.com/uuid-rs/uuid", rev = "9bb93b6", features = ["v4"] }
+ttf-parser = "0.6.2"
+uuid = { version = "0.8.1", features = ["v4"] }
 
 [dev-dependencies]
 env_logger = { version = "0.7", default-features = false }
