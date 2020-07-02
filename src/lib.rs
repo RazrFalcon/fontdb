@@ -404,11 +404,6 @@ pub struct FaceInfo {
 
     /// A font face stretch.
     pub stretch: Stretch,
-
-    /// Indicates that this font face is variable.
-    ///
-    /// https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview
-    pub variable: bool,
 }
 
 
@@ -569,7 +564,6 @@ fn parse_face_info(
         style,
         weight: Weight(font.weight().to_number()),
         stretch: font.width(),
-        variable: font.is_variable(),
     })
 }
 
