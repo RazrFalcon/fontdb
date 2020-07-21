@@ -544,13 +544,13 @@ fn parse_face_info(
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
-    let font = ttf_parser::Font::from_data(data, index).ok_or(LoadError::MalformedFont)?;
+    let face = ttf_parser::Face::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
 
-    let family = parse_family_name(&font).ok_or(LoadError::UnnamedFont)?;
+    let family = parse_family_name(&face).ok_or(LoadError::UnnamedFont)?;
 
-    let style = if font.is_italic() {
+    let style = if face.is_italic() {
         Style::Italic
-    } else if font.is_oblique() {
+    } else if face.is_oblique() {
         Style::Oblique
     } else {
         Style::Normal
@@ -562,18 +562,18 @@ fn parse_face_info(
         index,
         family,
         style,
-        weight: Weight(font.weight().to_number()),
-        stretch: font.width(),
+        weight: Weight(face.weight().to_number()),
+        stretch: face.width(),
     })
 }
 
-fn parse_family_name(font: &ttf_parser::Font) -> Option<String> {
-    let name_record = font.names().find(|name| {
+fn parse_family_name(face: &ttf_parser::Face) -> Option<String> {
+    let name_record = face.names().find(|name| {
         name.name_id() == ttf_parser::name_id::FAMILY && name.is_supported_encoding()
     })?;
 
     if name_record.is_unicode() {
-        name_record.name_utf8()
+        name_record.to_string()
     } else if name_record.is_mac_roman() {
         // We support only MacRoman encoding here, which should be enough in most cases.
         let mut raw_data = Vec::with_capacity(name_record.name().len());
@@ -598,12 +598,7 @@ impl NameExt for ttf_parser::Name<'_> {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
         const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
 
-        let platform_id = match self.platform_id() {
-            Some(id) => id,
-            None => return false,
-        };
-
-           platform_id == ttf_parser::PlatformId::Macintosh
+           self.platform_id() == ttf_parser::PlatformId::Macintosh
         && self.encoding_id() == MACINTOSH_ROMAN_ENCODING_ID
     }
 

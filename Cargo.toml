@@ -14,7 +14,7 @@ categories = ["text-processing"]
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.1", optional = true }
-ttf-parser = "0.6.2"
+ttf-parser = "0.8"
 uuid = { version = "0.8.1", features = ["v4"] }
 
 [dev-dependencies]
