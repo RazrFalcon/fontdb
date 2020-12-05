@@ -23,3 +23,4 @@ env_logger = { version = "0.7", default-features = false }
 [features]
 default = ["fs"]
 fs = ["memmap2"] # allows local filesystem interactions
+web-sys = ["uuid/wasm-bindgen"]
