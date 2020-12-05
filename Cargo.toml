@@ -1,6 +1,6 @@
 [package]
 name = "fontdb"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
 edition = "2018"
 description = "A simple, in-memory font database with CSS-like queries."
@@ -14,7 +14,7 @@ categories = ["text-processing"]
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.1", optional = true }
-ttf-parser = "0.8"
+ttf-parser = "0.9"
 uuid = { version = "0.8.1", features = ["v4"] }
 
 [dev-dependencies]

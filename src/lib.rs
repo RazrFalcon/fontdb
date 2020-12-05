@@ -52,7 +52,7 @@ But we do not keep such files open forever. Instead, we are memory-mapping files
 [ttf-parser]: https://github.com/RazrFalcon/ttf-parser
 */
 
-#![doc(html_root_url = "https://docs.rs/fontdb/0.2.0")]
+#![doc(html_root_url = "https://docs.rs/fontdb/0.3.0")]
 
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
