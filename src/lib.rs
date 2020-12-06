@@ -61,16 +61,22 @@ But we do not keep such files open forever. Instead, we are memory-mapping files
 #[cfg(feature = "fs")] use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use uuid::Uuid;
 use log::warn;
 pub use ttf_parser::Width as Stretch;
 
 
-/// An unique font ID.
+/// A unique per database face ID.
 ///
-/// Stored as UUIDv4 internally.
+/// We're using `u32` internally, which is auto-incremented for each face.
+/// A face removal doesn't decrement the counter.
+///
+/// Since `Database` is not global/unique, we cannot guarantee that a specific ID
+/// is actually from the same db instance. This is up to the caller.
+///
+/// ID overflow will cause a panic, but it's highly unlikely that someone would
+/// load more than 4 billion font faces.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
-pub struct ID(Uuid);
+pub struct ID(u32);
 
 
 /// A list of possible font loading errors.
@@ -108,6 +114,7 @@ impl std::fmt::Display for LoadError {
 /// A font database.
 #[derive(Clone, Debug)]
 pub struct Database {
+    next_id: u32,
     faces: Vec<FaceInfo>,
     family_serif: Option<String>,
     family_sans_serif: Option<String>,
@@ -121,6 +128,7 @@ impl Database {
     #[inline]
     pub fn new() -> Self {
         Database {
+            next_id: 0,
             faces: Vec::new(),
             family_serif: None,
             family_sans_serif: None,
@@ -145,7 +153,8 @@ impl Database {
 
         let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
         for index in 0..n {
-            match parse_face_info(source.clone(), &data, index) {
+            self.next_id = self.next_id.checked_add(1).unwrap();
+            match parse_face_info(self.next_id, source.clone(), &data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => warn!("Failed to load a font face {} from data cause {}.", index, e),
             }
@@ -164,7 +173,8 @@ impl Database {
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
-            match parse_face_info(source.clone(), data, index) {
+            self.next_id = self.next_id.checked_add(1).unwrap();
+            match parse_face_info(self.next_id, source.clone(), data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => {
                     warn!("Failed to load a font face {} from '{}' cause {}.",
@@ -540,6 +550,7 @@ impl Default for Style {
 
 
 fn parse_face_info(
+    id: u32,
     source: Arc<Source>,
     data: &[u8],
     index: u32,
@@ -557,7 +568,7 @@ fn parse_face_info(
     };
 
     Ok(FaceInfo {
-        id: ID(Uuid::new_v4()),
+        id: ID(id),
         source,
         index,
         family,

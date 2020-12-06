@@ -15,7 +15,6 @@ categories = ["text-processing"]
 log = "0.4"
 memmap2 = { version = "0.1", optional = true }
 ttf-parser = "0.9"
-uuid = { version = "0.8.1", features = ["v4"] }
 
 [dev-dependencies]
 env_logger = { version = "0.7", default-features = false }
@@ -23,4 +22,3 @@ env_logger = { version = "0.7", default-features = false }
 [features]
 default = ["fs"]
 fs = ["memmap2"] # allows local filesystem interactions
-web-sys = ["uuid/wasm-bindgen"]

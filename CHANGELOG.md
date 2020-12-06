@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- Use a simple `u32` for ID instead of UUID.
 
 ## [0.3.0] - 2020-12-05
 ### Changed
