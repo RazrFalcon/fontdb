@@ -356,8 +356,8 @@ impl Database {
     /// # Example
     ///
     /// ```ignore
-    /// let is_variable = db.with_font_data(id, |font_data, face_index| {
-    ///     let font = ttf_parser::Font::from_data(font_data, face_index).unwrap();
+    /// let is_variable = db.with_face_data(id, |font_data, face_index| {
+    ///     let font = ttf_parser::Face::from_slice(font_data, face_index).unwrap();
     ///     font.is_variable()
     /// })?;
     /// ```
@@ -405,6 +405,13 @@ pub struct FaceInfo {
     ///
     /// [name ID]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
     pub family: String,
+
+    /// A PostScript name.
+    ///
+    /// Corresponds to a *PostScript name* (6) [name ID] in a TrueType font.
+    ///
+    /// [name ID]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
+    pub post_script_name: String,
 
     /// A font face style.
     pub style: Style,
@@ -557,7 +564,10 @@ fn parse_face_info(
 ) -> Result<FaceInfo, LoadError> {
     let face = ttf_parser::Face::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
 
-    let family = parse_family_name(&face).ok_or(LoadError::UnnamedFont)?;
+    let family = parse_name(ttf_parser::name_id::FAMILY, &face).ok_or(LoadError::UnnamedFont)?;
+
+    let post_script_name = parse_name(ttf_parser::name_id::POST_SCRIPT_NAME, &face)
+        .ok_or(LoadError::UnnamedFont)?;
 
     let style = if face.is_italic() {
         Style::Italic
@@ -572,15 +582,16 @@ fn parse_face_info(
         source,
         index,
         family,
+        post_script_name,
         style,
         weight: Weight(face.weight().to_number()),
         stretch: face.width(),
     })
 }
 
-fn parse_family_name(face: &ttf_parser::Face) -> Option<String> {
+fn parse_name(name_id: u16, face: &ttf_parser::Face) -> Option<String> {
     let name_record = face.names().find(|name| {
-        name.name_id() == ttf_parser::name_id::FAMILY && name.is_supported_encoding()
+        name.name_id() == name_id && name.is_supported_encoding()
     })?;
 
     if name_record.is_unicode() {

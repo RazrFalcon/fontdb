@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `FaceInfo::post_script_name`
 
 ## [0.4.0] - 2020-12-06
 ### Changed
