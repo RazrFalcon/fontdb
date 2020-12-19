@@ -421,6 +421,9 @@ pub struct FaceInfo {
 
     /// A font face stretch.
     pub stretch: Stretch,
+
+    /// Indicates that the font face is monospaced.
+    pub monospaced: bool,
 }
 
 
@@ -586,6 +589,7 @@ fn parse_face_info(
         style,
         weight: Weight(face.weight().to_number()),
         stretch: face.width(),
+        monospaced: face.is_monospaced(),
     })
 }
 
