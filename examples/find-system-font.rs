@@ -4,7 +4,7 @@ fn main() {
 
     let mut db = fontdb::Database::new();
     let now = std::time::Instant::now();
-    load_system_fonts(&mut db);
+    db.load_system_fonts();
     db.set_serif_family("Times New Roman");
     db.set_sans_serif_family("Arial");
     db.set_cursive_family("Comic Sans MS");
@@ -31,37 +31,5 @@ fn main() {
         None => {
             println!("Error: '{}' not found.", FAMILY_NAME);
         }
-    }
-}
-
-// The `fontdb` crate doesn't handle system fonts loading, so we have to do it ourselves.
-//
-// Note that the code below is just an example and doesn't represent
-// a complete solution for system fonts loading.
-
-#[cfg(target_os = "windows")]
-fn load_system_fonts(db: &mut fontdb::Database) {
-    db.load_fonts_dir("C:\\Windows\\Fonts\\");
-}
-
-#[cfg(target_os = "macos")]
-fn load_system_fonts(db: &mut fontdb::Database) {
-    db.load_fonts_dir("/Library/Fonts");
-    db.load_fonts_dir("/System/Library/Fonts");
-
-    if let Ok(ref home) = std::env::var("HOME") {
-        let path = std::path::Path::new(home).join("Library/Fonts");
-        db.load_fonts_dir(path);
-    }
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn load_system_fonts(db: &mut fontdb::Database) {
-    db.load_fonts_dir("/usr/share/fonts/");
-    db.load_fonts_dir("/usr/local/share/fonts/");
-
-    if let Ok(ref home) = std::env::var("HOME") {
-        let path = std::path::Path::new(home).join(".local/share/fonts");
-        db.load_fonts_dir(path);
     }
 }

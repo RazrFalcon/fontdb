@@ -5,20 +5,19 @@
 
 - The database can load fonts from files, directories and raw data (`Vec<u8>`).
 - The database can match a font using CSS-like queries. See `Database::query`.
+- The database can try to load system fonts.
+  Currently, this is implemented by scanning predefined directories.
+  The library does not interact with the system API.
 - Provides a unique ID for each font face.
 
 # Non-goals
 
-- System fonts loading.<br>
-  This library is intentionally doesn't load system fonts.
-  This is a very complex feature and should be handled by the caller or other libraries.
-
-- Font properties querying.<br>
+- Advanced font properties querying.<br>
   The database provides only storage and matching capabilities.
   For font properties querying you can use [ttf-parser].
 
 - A font fallback mechanism.<br>
-  This library can be used to implement a font fallback mechanism, but it doesn't implement it.
+  This library can be used to implement a font fallback mechanism, but it doesn't implement one.
 
 - Application's global database.<br>
   The database doesn't use `static`, therefore it's up to the caller where it should be stored.
@@ -218,6 +217,48 @@ impl Database {
                     // TODO: ignore symlinks?
                     self.load_fonts_dir(path);
                 }
+            }
+        }
+    }
+
+    /// Attempts to load system fonts.
+    ///
+    /// Supports Windows, Linux and macOS.
+    ///
+    /// System fonts loading is a surprisingly complicated task,
+    /// mostly unsolvable without interacting with system libraries.
+    /// And since `fontdb` tries to be small and portable, this method
+    /// will simply scan some predefined directories.
+    /// Which means that fonts that are not in those directories must
+    /// be added manually.
+    #[cfg(feature = "fs")]
+    pub fn load_system_fonts(&mut self) {
+        #[cfg(target_os = "windows")]
+        {
+            self.load_fonts_dir_impl("C:\\Windows\\Fonts\\");
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            self.load_fonts_dir("/Library/Fonts");
+            self.load_fonts_dir("/System/Library/Fonts");
+            self.load_fonts_dir("/Network/Library/Fonts");
+
+            if let Ok(ref home) = std::env::var("HOME") {
+                let path = std::path::Path::new(home).join("Library/Fonts");
+                self.load_fonts_dir(path);
+            }
+        }
+
+        // Linux.
+        #[cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))]
+        {
+            self.load_fonts_dir("/usr/share/fonts/");
+            self.load_fonts_dir("/usr/local/share/fonts/");
+
+            if let Ok(ref home) = std::env::var("HOME") {
+                let path = std::path::Path::new(home).join(".local/share/fonts");
+                self.load_fonts_dir(path);
             }
         }
     }

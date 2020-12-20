@@ -10,20 +10,19 @@
 
 - The database can load fonts from files, directories and raw data (`Vec<u8>`).
 - The database can match a font using CSS-like queries. See `Database::query`.
+- The database can try to load system fonts.
+  Currently, this is implemented by scanning predefined directories.
+  The library does not interact with the system API.
 - Provides a unique ID for each font face.
 
 ## Non-goals
 
-- System fonts loading.<br>
-  This library is intentionally doesn't load system fonts.
-  This is a very complex feature and should be handled by the caller or other libraries.
-
-- Font properties querying.<br>
+- Advanced font properties querying.<br>
   The database provides only storage and matching capabilities.
   For font properties querying you can use [ttf-parser].
 
 - A font fallback mechanism.<br>
-  This library can be used to implement a font fallback mechanism, but it doesn't implement it.
+  This library can be used to implement a font fallback mechanism, but it doesn't implement one.
 
 - Application's global database.<br>
   The database doesn't use `static`, therefore it's up to the caller where it should be stored.

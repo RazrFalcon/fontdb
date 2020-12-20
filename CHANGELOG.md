@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - `FaceInfo::post_script_name`
 - `FaceInfo::monospaced`
+- `Database::load_system_fonts`
 
 ## [0.4.0] - 2020-12-06
 ### Changed
