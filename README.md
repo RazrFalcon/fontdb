@@ -1,5 +1,5 @@
 # fontdb
-[![Build Status](https://travis-ci.org/RazrFalcon/fontdb.svg?branch=master)](https://travis-ci.org/RazrFalcon/fontdb)
+![Build Status](https://github.com/RazrFalcon/fontdb/workflows/Rust/badge.svg)
 [![Crates.io](https://img.shields.io/crates/v/fontdb.svg)](https://crates.io/crates/fontdb)
 [![Documentation](https://docs.rs/fontdb/badge.svg)](https://docs.rs/fontdb)
 [![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-orange.svg)](https://www.rust-lang.org)
