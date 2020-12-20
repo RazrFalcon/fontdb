@@ -235,7 +235,7 @@ impl Database {
     pub fn load_system_fonts(&mut self) {
         #[cfg(target_os = "windows")]
         {
-            self.load_fonts_dir_impl("C:\\Windows\\Fonts\\");
+            self.load_fonts_dir("C:\\Windows\\Fonts\\");
         }
 
         #[cfg(target_os = "macos")]
