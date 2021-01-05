@@ -242,6 +242,7 @@ impl Database {
         {
             self.load_fonts_dir("/Library/Fonts");
             self.load_fonts_dir("/System/Library/Fonts");
+            self.load_fonts_dir("/System/Library/AssetsV2/com_apple_MobileAsset_Font6");
             self.load_fonts_dir("/Network/Library/Fonts");
 
             if let Ok(ref home) = std::env::var("HOME") {
