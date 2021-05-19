@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.5.2] - 2021-05-19
 ### Changed
 - Update `memmap2`
+- Add additional search dir for macOS.
 
 ## [0.5.1] - 2020-12-20
 ### Fixed
