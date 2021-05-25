@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.4] - 2021-05-25
+### Added
+- Implement `Eq`, `Hash` for `Query`, `Family`, `Weight` and `Style`.
+  [@dhardy](https://github.com/dhardy)
+
+### Changed
+- Update `ttf-parser`
+
 ## [0.5.3] - 2021-05-19
 ### Changed
 - Update `ttf-parser`
@@ -40,7 +48,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/RazrFalcon/fontdb/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/RazrFalcon/fontdb/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/RazrFalcon/fontdb/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/RazrFalcon/fontdb/compare/v0.5.0...v0.5.1
