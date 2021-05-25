@@ -497,7 +497,7 @@ pub enum Source {
 /// A database query.
 ///
 /// Mainly used by `Database::query()`.
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Hash)]
 pub struct Query<'a> {
     /// A prioritized list of font family names or generic family names.
     ///
@@ -523,7 +523,7 @@ pub struct Query<'a> {
 
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Family<'a> {
     /// The name of a font family of choice.
     Name(&'a str),
@@ -550,7 +550,7 @@ pub enum Family<'a> {
 
 
 /// Specifies the weight of glyphs in the font, their degree of blackness or stroke thickness.
-#[derive(Clone, Copy, PartialOrd, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug, Hash)]
 pub struct Weight(pub u16);
 
 impl Default for Weight {
@@ -583,7 +583,7 @@ impl Weight {
 
 
 /// Allows italic or oblique faces to be selected.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Style {
     /// A face that is neither italic not obliqued.
     Normal,
