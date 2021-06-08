@@ -609,7 +609,9 @@ fn parse_face_info(
 ) -> Result<FaceInfo, LoadError> {
     let face = ttf_parser::Face::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
 
-    let family = parse_name(ttf_parser::name_id::FAMILY, &face).ok_or(LoadError::UnnamedFont)?;
+    let family = parse_name(ttf_parser::name_id::TYPOGRAPHIC_FAMILY, &face)
+        .or_else(|| parse_name(ttf_parser::name_id::FAMILY, &face))
+        .ok_or(LoadError::UnnamedFont)?;
 
     let post_script_name = parse_name(ttf_parser::name_id::POST_SCRIPT_NAME, &face)
         .ok_or(LoadError::UnnamedFont)?;
