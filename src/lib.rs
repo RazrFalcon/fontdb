@@ -150,10 +150,10 @@ impl Database {
             Source::File(_) => unreachable!(),
         };
 
-        let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+        let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
             self.next_id = self.next_id.checked_add(1).unwrap();
-            match parse_face_info(self.next_id, source.clone(), &data, index) {
+            match parse_face_info(self.next_id, source.clone(), data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => warn!("Failed to load a font face {} from data cause {}.", index, e),
             }
@@ -332,7 +332,7 @@ impl Database {
 
             let mut ids = Vec::new();
             let mut candidates = Vec::new();
-            for face in self.faces.iter().filter(|face| &face.family == name) {
+            for face in self.faces.iter().filter(|face| face.family == name) {
                 ids.push(face.id);
                 candidates.push(FaceProperties {
                     style: face.style,
@@ -354,7 +354,7 @@ impl Database {
     fn family_name<'a>(&'a self, family: &'a Family) -> Option<&'a str> {
         use std::ops::Deref;
         match family {
-            Family::Name(ref name) => Some(name),
+            Family::Name(name) => Some(name),
             Family::Serif => self.family_serif.as_ref().map(|t| t.deref()),
             Family::SansSerif => self.family_sans_serif.as_ref().map(|t| t.deref()),
             Family::Cursive => self.family_cursive.as_ref().map(|t| t.deref()),
@@ -758,8 +758,7 @@ fn find_best_match(candidates: &[FaceProperties], query: &Query) -> Option<usize
     // The spec doesn't say what to do if the weight is between 400 and 500 exclusive, so we
     // just use 450 as the cutoff.
     let weight = query.weight.0;
-    let matches = weight >= 400
-        && weight < 450
+    let matches = (400..450).contains(&weight)
         && matching_set
         .iter()
         .any(|&index| candidates[index].weight.0 == 500);
@@ -767,7 +766,7 @@ fn find_best_match(candidates: &[FaceProperties], query: &Query) -> Option<usize
     let matching_weight = if matches {
         // Check 500 first.
         Weight::MEDIUM
-    } else if weight >= 450 && weight <= 500 &&
+    } else if (450..=500).contains(&weight) &&
         matching_set.iter().any(|&index| candidates[index].weight.0 == 400)
     {
         // Check 400 first.
