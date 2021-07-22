@@ -258,8 +258,9 @@ impl Database {
             self.load_fonts_dir("/usr/local/share/fonts/");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let path = std::path::Path::new(home).join(".local/share/fonts");
-                self.load_fonts_dir(path);
+                let home_path = std::path::Path::new(home);
+                self.load_fonts_dir(home_path.join(".fonts"));
+                self.load_fonts_dir(home_path.join(".local/share/fonts"));
             }
         }
     }
