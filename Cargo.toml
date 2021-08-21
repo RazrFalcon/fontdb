@@ -13,7 +13,7 @@ categories = ["text-processing"]
 
 [dependencies]
 log = "0.4"
-memmap2 = { version = "0.2", optional = true }
+memmap2 = { version = "0.3", optional = true }
 ttf-parser = "0.12.1"
 
 [dev-dependencies]
