@@ -115,25 +115,36 @@ impl std::fmt::Display for LoadError {
 pub struct Database {
     next_id: u32,
     faces: Vec<FaceInfo>,
-    family_serif: Option<String>,
-    family_sans_serif: Option<String>,
-    family_cursive: Option<String>,
-    family_fantasy: Option<String>,
-    family_monospace: Option<String>,
+    family_serif: String,
+    family_sans_serif: String,
+    family_cursive: String,
+    family_fantasy: String,
+    family_monospace: String,
 }
 
 impl Database {
     /// Create a new, empty `Database`.
+    ///
+    /// Generic font families would be set to:
+    ///
+    /// - `serif` - Times New Roman
+    /// - `sans-serif` - Arial
+    /// - `cursive` - Comic Sans MS
+    /// - `fantasy` - Impact (Papyrus on macOS)
+    /// - `monospace` - Courier New
     #[inline]
     pub fn new() -> Self {
         Database {
             next_id: 0,
             faces: Vec::new(),
-            family_serif: None,
-            family_sans_serif: None,
-            family_cursive: None,
-            family_fantasy: None,
-            family_monospace: None,
+            family_serif: "Times New Roman".to_string(),
+            family_sans_serif: "Arial".to_string(),
+            family_cursive: "Comic Sans MS".to_string(),
+            #[cfg(not(target_os = "macos"))]
+            family_fantasy: "Impact".to_string(),
+            #[cfg(target_os = "macos")]
+            family_fantasy: "Papyrus".to_string(),
+            family_monospace: "Courier New".to_string(),
         }
     }
 
@@ -300,36 +311,33 @@ impl Database {
 
     /// Sets the family that will be used by `Family::Serif`.
     pub fn set_serif_family<S: Into<String>>(&mut self, family: S) {
-        self.family_serif = Some(family.into());
+        self.family_serif = family.into();
     }
 
     /// Sets the family that will be used by `Family::SansSerif`.
     pub fn set_sans_serif_family<S: Into<String>>(&mut self, family: S) {
-        self.family_sans_serif = Some(family.into());
+        self.family_sans_serif = family.into();
     }
 
     /// Sets the family that will be used by `Family::Cursive`.
     pub fn set_cursive_family<S: Into<String>>(&mut self, family: S) {
-        self.family_cursive = Some(family.into());
+        self.family_cursive = family.into();
     }
 
     /// Sets the family that will be used by `Family::Fantasy`.
     pub fn set_fantasy_family<S: Into<String>>(&mut self, family: S) {
-        self.family_fantasy = Some(family.into());
+        self.family_fantasy = family.into();
     }
 
     /// Sets the family that will be used by `Family::Monospace`.
     pub fn set_monospace_family<S: Into<String>>(&mut self, family: S) {
-        self.family_monospace = Some(family.into());
+        self.family_monospace = family.into();
     }
 
     /// Performs a CSS-like query and returns the best matched font face.
     pub fn query(&self, query: &Query) -> Option<ID> {
         for family in query.families {
-            let name = match self.family_name(family) {
-                Some(name) => name,
-                None => continue, // skip unset generic font families
-            };
+            let name = self.family_name(family);
 
             let mut ids = Vec::new();
             let mut candidates = Vec::new();
@@ -352,15 +360,14 @@ impl Database {
         None
     }
 
-    fn family_name<'a>(&'a self, family: &'a Family) -> Option<&'a str> {
-        use std::ops::Deref;
+    fn family_name<'a>(&'a self, family: &'a Family) -> &'a str {
         match family {
-            Family::Name(ref name) => Some(name),
-            Family::Serif => self.family_serif.as_ref().map(|t| t.deref()),
-            Family::SansSerif => self.family_sans_serif.as_ref().map(|t| t.deref()),
-            Family::Cursive => self.family_cursive.as_ref().map(|t| t.deref()),
-            Family::Fantasy => self.family_fantasy.as_ref().map(|t| t.deref()),
-            Family::Monospace => self.family_monospace.as_ref().map(|t| t.deref()),
+            Family::Name(ref name) => name,
+            Family::Serif => self.family_serif.as_ref(),
+            Family::SansSerif => self.family_sans_serif.as_ref(),
+            Family::Cursive => self.family_cursive.as_ref(),
+            Family::Fantasy => self.family_fantasy.as_ref(),
+            Family::Monospace => self.family_monospace.as_ref(),
         }
     }
 
