@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+## [0.6.0] - 2021-08-21
+### Added
+- Search in `$HOME/.fonts` on Linux. [@Linus789](https://github.com/Linus789)
+
+### Changed
+- Generic font families are preset by default instead of being set to `None`.
 
 ## [0.5.4] - 2021-05-25
 ### Added
@@ -48,7 +54,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RazrFalcon/fontdb/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/RazrFalcon/fontdb/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/RazrFalcon/fontdb/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/RazrFalcon/fontdb/compare/v0.5.1...v0.5.2
