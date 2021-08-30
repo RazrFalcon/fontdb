@@ -171,15 +171,9 @@ impl Database {
         }
     }
 
-    /// Loads a font file into the `Database`.
-    ///
-    /// Will load all font faces in case of a font collection.
-    #[cfg(feature = "fs")]
-    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
-        let source = Arc::new(Source::File(path.as_ref().into()));
-
-        let file = std::fs::File::open(path.as_ref())?;
-        let data = unsafe { &memmap2::MmapOptions::new().map(&file)? };
+    /// Backend function used by load_font_file to load font files
+    fn load_fonts_from_file(&mut self, path: &std::path::Path, data : &[u8]) {
+        let source = Arc::new(Source::File(path.into()));
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
@@ -188,11 +182,32 @@ impl Database {
                 Ok(info) => self.faces.push(info),
                 Err(e) => {
                     warn!("Failed to load a font face {} from '{}' cause {}.",
-                          index, path.as_ref().display(), e)
+                          index, path.display(), e)
                 }
             }
         }
+    }
 
+    /// Loads a font file into the `Database`.
+    ///
+    /// Will load all font faces in case of a font collection.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
+    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        let file = std::fs::File::open(path.as_ref())?;
+        let data : &[u8] = unsafe { &memmap2::MmapOptions::new().map(&file)? };
+
+        self.load_fonts_from_file(path.as_ref(), data);
+        Ok(())
+    }
+
+    /// Loads a font file into the `Database`.
+    ///
+    /// Will load all font faces in case of a font collection.
+    #[cfg(all(feature = "fs", not(feature = "memmap")))]
+    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        let data = std::fs::read(path.as_ref())?;
+
+        self.load_fonts_from_file(path.as_ref(), &data);
         Ok(())
     }
 
@@ -416,10 +431,17 @@ impl Database {
     {
         let (src, face_index) = self.face_source(id)?;
         match &*src {
-            #[cfg(feature = "fs")]
+            #[cfg(all(feature = "fs", not(feature="memmap")))]
+            Source::File(ref path) => {
+                let data = std::fs::read(path).ok()?;
+
+                Some(p(&data, face_index))
+            }
+            #[cfg(all(feature = "fs", feature="memmap"))]
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
                 let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+
                 Some(p(data, face_index))
             }
             Source::Binary(ref data) => {

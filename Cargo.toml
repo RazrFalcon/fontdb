@@ -20,5 +20,6 @@ ttf-parser = "0.12.1"
 env_logger = { version = "0.8", default-features = false }
 
 [features]
-default = ["fs"]
-fs = ["memmap2"] # allows local filesystem interactions
+default = ["fs", "memmap"]
+fs = [] # allows local filesystem interactions
+memmap = ["fs", "memmap2"] # allows font files memory mapping, greatly improves performance
