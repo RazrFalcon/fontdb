@@ -17,5 +17,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - name: Install cargo-all-features
+      run: cargo install cargo-all-features
+
+    - name: Build all feature combinations
+      run: cargo build-all-features
+
     - name: Run tests
       run: cargo test

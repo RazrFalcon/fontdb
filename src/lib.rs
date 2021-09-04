@@ -172,6 +172,7 @@ impl Database {
     }
 
     /// Backend function used by load_font_file to load font files
+    #[cfg(feature = "fs")]
     fn load_fonts_from_file(&mut self, path: &std::path::Path, data : &[u8]) {
         let source = Arc::new(Source::File(path.into()));
 
