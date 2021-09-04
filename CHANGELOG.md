@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.6.1] - 2021-09-04
+### Changed
+- Split the `fs` build feature into `fs` and `memmap`. [@neinseg](https://github.com/neinseg)
+
 ## [0.6.0] - 2021-08-21
 ### Added
 - Search in `$HOME/.fonts` on Linux. [@Linus789](https://github.com/Linus789)
