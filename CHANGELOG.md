@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- The `Source` enum has two new variants `SharedFile` and `SharedBinary`, used them
+  using unsafe persistent memory mappings.
 
 ## [0.6.2] - 2021-09-04
 ### Fixed
