@@ -61,8 +61,7 @@ then you can use the unsafe [`Database::make_shared_face_data`] function.
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
 
-#[cfg(feature = "fs")] use std::path::Path;
-use std::path::PathBuf;
+#[cfg(feature = "fs")] use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use log::warn;
