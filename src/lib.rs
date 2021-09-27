@@ -157,15 +157,13 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        self.load_font_source(Source::Binary(data))
+        self.load_font_source(Source::Binary(Arc::new(data)))
     }
 
     /// Loads a font from the given source into the `Database`.
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_source(&mut self, source: Source) {
-        let source = Arc::new(source);     
-
         source.with_data(|data|{
             let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
             for index in 0..n {
@@ -181,7 +179,7 @@ impl Database {
     /// Backend function used by load_font_file to load font files
     #[cfg(feature = "fs")]
     fn load_fonts_from_file(&mut self, path: &std::path::Path, data : &[u8]) {
-        let source = Arc::new(Source::File(path.into()));
+        let source = Source::File(path.into());
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
@@ -411,7 +409,7 @@ impl Database {
     }
 
     /// Returns font face storage and the face index by `ID`.
-    pub fn face_source(&self, id: ID) -> Option<(Arc<Source>, u32)> {
+    pub fn face_source(&self, id: ID) -> Option<(Source, u32)> {
         self.face(id).map(|info| (info.source.clone(), info.index))
     }
 
@@ -453,51 +451,43 @@ impl Database {
     /// If the underlying font provides multiple faces, then all faces are updated to participate in
     /// the data sharing. If the face was previously marked for data sharing, then this function will
     /// return a clone of the existing reference.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
     pub unsafe fn make_shared_face_data(&mut self, id: ID) -> Option<(Arc<dyn AsRef<[u8]> + Send + Sync>, u32)> {
         let face_info = self.faces.iter().find(|item| item.id == id)?;
         let face_index = face_info.index;
 
         let old_source = face_info.source.clone();
 
-        let (new_source, erased_shared_data) = match old_source.as_ref() {
+        let (path, shared_data) = match &old_source {
             Source::Binary(data) => {
-                let shared_data = Arc::new(data.clone());
-                (Source::SharedBinary(shared_data.clone()), shared_data as Arc<dyn AsRef<[u8]> + Send + Sync>)
+                return Some((data.clone(), face_index));
             },
-            #[cfg(all(feature = "fs", not(feature = "memmap")))]
-            Source::File(ref path) => {
-                let data = std::fs::read(path).ok()?;
-                (Some(path.clone()), Arc::new(data) as Arc<dyn AsRef<[u8]> + Send + Sync>)
-            }
-            #[cfg(all(feature = "fs", feature = "memmap"))]
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
                 let shared_data = Arc::new(memmap2::MmapOptions::new().map(&file).ok()?) as Arc<dyn AsRef<[u8]> + Send + Sync>;
-                (Source::SharedFile(path.clone(), shared_data.clone()), shared_data)
+                (path.clone(), shared_data)
             }
-            #[cfg(all(feature = "fs", feature = "memmap"))]
             Source::SharedFile(_, data) => {
-                return Some((data.clone(), face_index));
-            }
-            Source::SharedBinary(data) => {
                 return Some((data.clone(), face_index));
             }
         };
 
-        let shared_source = Arc::new(new_source);
+        let shared_source = Source::SharedFile(path.clone(), shared_data.clone());
 
         self.faces.iter_mut().for_each(|face| {
-            if Arc::ptr_eq(&face.source, &old_source) {
+
+            if matches!(&face.source, Source::File(old_path) if old_path == &path) {
                 face.source = shared_source.clone();
             }
         });
 
-        Some((erased_shared_data, face_index))
+        Some((shared_data, face_index))
     }
 
     /// Transfers ownership of shared font data back to the font database. This is the reverse operation
     /// of [`Self::make_shared_face_data`]. If the font data belonging to the specified face is mapped
     /// from a file on disk, then that mapping is closed and the data becomes private to the process again.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
     pub fn make_face_data_unshared(&mut self, id: ID) {
         let face_info = match self.faces.iter().find(|item| item.id == id) {
             Some(face_info) => face_info,
@@ -506,17 +496,16 @@ impl Database {
 
         let old_source = face_info.source.clone();
 
-        let new_source = Arc::new(match old_source.as_ref() {
+        let shared_path = match old_source {
             #[cfg(all(feature = "fs", feature = "memmap"))]
-            Source::SharedFile(path, _) =>  Source::File(path.clone()),
-            Source::SharedBinary(shared_data) => {
-                Source::Binary(shared_data.as_ref().as_ref().to_vec())
-            },
+            Source::SharedFile(path, _) => path.clone(),
             _ => return,
-        });
+        };
+
+        let new_source = Source::File(shared_path.clone());
 
         self.faces.iter_mut().for_each(|face| {
-            if Arc::ptr_eq(&face.source, &old_source) {
+            if matches!(&face.source, Source::SharedFile(path, ..) if path == &shared_path) {
                 face.source = new_source.clone();
             }
         });
@@ -535,9 +524,9 @@ pub struct FaceInfo {
 
     /// A font source.
     ///
-    /// We have to use `Rc`, because multiple `FaceInfo` objects can reference
-    /// the same data in case of font collections.
-    pub source: Arc<Source>,
+    /// Note that multiple `FaceInfo` objects can reference the same data in case of
+    /// font collections, which means that they'll use the same Source.
+    pub source: Source,
 
     /// A face index in the `source`.
     pub index: u32,
@@ -586,8 +575,8 @@ struct FaceProperties {
 /// Stores the whole font and not just a single face.
 #[derive(Clone)]
 pub enum Source {
-    /// A font's raw data. Owned by the database.
-    Binary(Vec<u8>),
+    /// A font's raw data, typically backed by a Vec<u8>.
+    Binary(Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's path.
     #[cfg(feature = "fs")]
@@ -596,15 +585,15 @@ pub enum Source {
     /// A font's raw data originating from a shared file mapping.
     #[cfg(all(feature = "fs", feature = "memmap"))]
     SharedFile(PathBuf, Arc<dyn AsRef<[u8]> + Sync + Send>),
-
-    /// A font's raw data. Shared between the database and the application.
-    SharedBinary(Arc<dyn AsRef<[u8]> + Sync + Send>),
 }
 
 impl std::fmt::Debug for Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Binary(arg0) => f.debug_tuple("Binary").field(arg0).finish(),
+            Self::Binary(arg0) => f
+                .debug_tuple("SharedBinary")
+                .field(&arg0.as_ref().as_ref())
+                .finish(),
             #[cfg(feature = "fs")]
             Self::File(arg0) => f.debug_tuple("File").field(arg0).finish(),
             #[cfg(all(feature = "fs", feature = "memmap"))]
@@ -612,10 +601,6 @@ impl std::fmt::Debug for Source {
                 .debug_tuple("SharedFile")
                 .field(arg0)
                 .field(&arg1.as_ref().as_ref())
-                .finish(),
-            Self::SharedBinary(arg0) => f
-                .debug_tuple("SharedBinary")
-                .field(&arg0.as_ref().as_ref())
                 .finish(),
         }
     }
@@ -640,15 +625,12 @@ impl Source {
                 Some(p(data))
             }
             Source::Binary(ref data) => {
-                Some(p(data))
+                Some(p(data.as_ref().as_ref()))
             },
             #[cfg(all(feature = "fs", feature = "memmap"))]
             Source::SharedFile(_, ref data) => {
                 Some(p(data.as_ref().as_ref()))
             }
-            Source::SharedBinary(ref data) => {
-                Some(p(data.as_ref().as_ref()))
-            },
         }   
     }
 }
@@ -762,7 +744,7 @@ impl Default for Style {
 
 fn parse_face_info(
     id: u32,
-    source: Arc<Source>,
+    source: Source,
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
