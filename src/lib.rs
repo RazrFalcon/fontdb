@@ -157,26 +157,25 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        let source = Arc::new(Source::Binary(data));
+        self.load_font_source(Source::Binary(data))
+    }
 
-        // Borrow `source` data.
-        let data = match &*source {
-            Source::Binary(ref data) => data,
-            Source::SharedBinary(_) => unreachable!(),
-            #[cfg(feature = "fs")]
-            Source::File(_) => unreachable!(),
-            #[cfg(all(feature = "fs", feature = "memmap"))]
-            Source::SharedFile(_, _) => unreachable!(),
-        };
+    /// Loads a font from the given source into the `Database`.
+    ///
+    /// Will load all font faces in case of a font collection.
+    pub fn load_font_source(&mut self, source: Source) {
+        let source = Arc::new(source);     
 
-        let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
-        for index in 0..n {
-            self.next_id = self.next_id.checked_add(1).unwrap();
-            match parse_face_info(self.next_id, source.clone(), &data, index) {
-                Ok(info) => self.faces.push(info),
-                Err(e) => warn!("Failed to load a font face {} from data cause {}.", index, e),
+        source.with_data(|data|{
+            let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+            for index in 0..n {
+                self.next_id = self.next_id.checked_add(1).unwrap();
+                match parse_face_info(self.next_id, source.clone(), &data, index) {
+                    Ok(info) => self.faces.push(info),
+                    Err(e) => warn!("Failed to load a font face {} from source cause {}.", index, e),
+                }
             }
-        }
+        });
     }
 
     /// Backend function used by load_font_file to load font files
@@ -439,31 +438,7 @@ impl Database {
         where P: FnOnce(&[u8], u32) -> T
     {
         let (src, face_index) = self.face_source(id)?;
-        match &*src {
-            #[cfg(all(feature = "fs", not(feature="memmap")))]
-            Source::File(ref path) => {
-                let data = std::fs::read(path).ok()?;
-
-                Some(p(&data, face_index))
-            }
-            #[cfg(all(feature = "fs", feature="memmap"))]
-            Source::File(ref path) => {
-                let file = std::fs::File::open(path).ok()?;
-                let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
-
-                Some(p(data, face_index))
-            }
-            Source::Binary(ref data) => {
-                Some(p(data, face_index))
-            },
-            #[cfg(all(feature = "fs", feature = "memmap"))]
-            Source::SharedFile(_, ref data) => {
-                Some(p(data.as_ref().as_ref(), face_index))
-            }
-            Source::SharedBinary(ref data) => {
-                Some(p(data, face_index))
-            },
-        }
+        src.with_data(|data| p(data, face_index))        
     }
 
     /// Makes the font data that backs the specified face id shared so that the application can
@@ -535,7 +510,7 @@ impl Database {
             #[cfg(all(feature = "fs", feature = "memmap"))]
             Source::SharedFile(path, _) =>  Source::File(path.clone()),
             Source::SharedBinary(shared_data) => {
-                Source::Binary(shared_data.as_ref().to_vec())
+                Source::Binary(shared_data.as_ref().as_ref().to_vec())
             },
             _ => return,
         });
@@ -623,7 +598,7 @@ pub enum Source {
     SharedFile(PathBuf, Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's raw data. Shared between the database and the application.
-    SharedBinary(Arc<Vec<u8>>),
+    SharedBinary(Arc<dyn AsRef<[u8]> + Sync + Send>),
 }
 
 impl std::fmt::Debug for Source {
@@ -638,8 +613,43 @@ impl std::fmt::Debug for Source {
                 .field(arg0)
                 .field(&arg1.as_ref().as_ref())
                 .finish(),
-            Self::SharedBinary(arg0) => f.debug_tuple("SharedBinary").field(arg0).finish(),
+            Self::SharedBinary(arg0) => f
+                .debug_tuple("SharedBinary")
+                .field(&arg0.as_ref().as_ref())
+                .finish(),
         }
+    }
+}
+
+impl Source {    
+    fn with_data<P, T>(&self, p: P) -> Option<T>
+        where P: FnOnce(&[u8]) -> T
+    {
+        match &self {
+            #[cfg(all(feature = "fs", not(feature="memmap")))]
+            Source::File(ref path) => {
+                let data = std::fs::read(path).ok()?;
+
+                Some(p(&data))
+            }
+            #[cfg(all(feature = "fs", feature="memmap"))]
+            Source::File(ref path) => {
+                let file = std::fs::File::open(path).ok()?;
+                let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+
+                Some(p(data))
+            }
+            Source::Binary(ref data) => {
+                Some(p(data))
+            },
+            #[cfg(all(feature = "fs", feature = "memmap"))]
+            Source::SharedFile(_, ref data) => {
+                Some(p(data.as_ref().as_ref()))
+            }
+            Source::SharedBinary(ref data) => {
+                Some(p(data.as_ref().as_ref()))
+            },
+        }   
     }
 }
 
