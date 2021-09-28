@@ -23,7 +23,7 @@ fn main() {
     match db.query(&query) {
         Some(id) => {
             let (src, index) = db.face_source(id).unwrap();
-            if let fontdb::Source::File(ref path) = &*src {
+            if let fontdb::Source::File(ref path) = &src {
                 println!("Font '{}':{} found in {}ms.", path.display(), index,
                          now.elapsed().as_micros() as f64 / 1000.0);
             }
