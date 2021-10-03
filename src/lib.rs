@@ -55,8 +55,6 @@ then you can use the unsafe [`Database::make_shared_face_data`] function.
 [ttf-parser]: https://github.com/RazrFalcon/ttf-parser
 */
 
-#![doc(html_root_url = "https://docs.rs/fontdb/0.6.2")]
-
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
@@ -435,7 +433,7 @@ impl Database {
         where P: FnOnce(&[u8], u32) -> T
     {
         let (src, face_index) = self.face_source(id)?;
-        src.with_data(|data| p(data, face_index))        
+        src.with_data(|data| p(data, face_index))
     }
 
     /// Makes the font data that backs the specified face id shared so that the application can
@@ -605,7 +603,7 @@ impl std::fmt::Debug for Source {
     }
 }
 
-impl Source {    
+impl Source {
     fn with_data<P, T>(&self, p: P) -> Option<T>
         where P: FnOnce(&[u8]) -> T
     {
@@ -630,7 +628,7 @@ impl Source {
             Source::SharedFile(_, ref data) => {
                 Some(p(data.as_ref().as_ref()))
             }
-        }   
+        }
     }
 }
 
