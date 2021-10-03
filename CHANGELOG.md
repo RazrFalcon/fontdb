@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- The `Source` enum has a new variant `SharedFile`, used for unsafe persistent
+  memory mappings.
+- `FaceInfo` stores `Source` directly now, not anymore in an `Arc`. Instead `Source::Binary`
+  now stores an `Arc` of the data.
 
 ## [0.6.2] - 2021-09-04
 ### Fixed

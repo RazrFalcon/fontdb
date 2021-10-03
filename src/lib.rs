@@ -46,7 +46,11 @@ with a hot disk cache and ~860ms with a cold one.
 # Safety
 
 The library relies on memory-mapped files, which is inherently unsafe.
-But we do not keep such files open forever. Instead, we are memory-mapping files only when needed.
+But we do not keep such files open forever. Instead, when using the safe
+APIs, we are memory-mapping files only when needed.
+
+If you would like to use a persistent memory mapping of the font files,
+then you can use the unsafe [`Database::make_shared_face_data`] function.
 
 [ttf-parser]: https://github.com/RazrFalcon/ttf-parser
 */
@@ -152,29 +156,29 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        let source = Arc::new(Source::Binary(data));
+        self.load_font_source(Source::Binary(Arc::new(data)))
+    }
 
-        // Borrow `source` data.
-        let data = match &*source {
-            Source::Binary(ref data) => data,
-            #[cfg(feature = "fs")]
-            Source::File(_) => unreachable!(),
-        };
-
-        let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
-        for index in 0..n {
-            self.next_id = self.next_id.checked_add(1).unwrap();
-            match parse_face_info(self.next_id, source.clone(), &data, index) {
-                Ok(info) => self.faces.push(info),
-                Err(e) => warn!("Failed to load a font face {} from data cause {}.", index, e),
+    /// Loads a font from the given source into the `Database`.
+    ///
+    /// Will load all font faces in case of a font collection.
+    pub fn load_font_source(&mut self, source: Source) {
+        source.with_data(|data|{
+            let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+            for index in 0..n {
+                self.next_id = self.next_id.checked_add(1).unwrap();
+                match parse_face_info(self.next_id, source.clone(), &data, index) {
+                    Ok(info) => self.faces.push(info),
+                    Err(e) => warn!("Failed to load a font face {} from source cause {}.", index, e),
+                }
             }
-        }
+        });
     }
 
     /// Backend function used by load_font_file to load font files
     #[cfg(feature = "fs")]
     fn load_fonts_from_file(&mut self, path: &std::path::Path, data : &[u8]) {
-        let source = Arc::new(Source::File(path.into()));
+        let source = Source::File(path.into());
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
@@ -404,7 +408,7 @@ impl Database {
     }
 
     /// Returns font face storage and the face index by `ID`.
-    pub fn face_source(&self, id: ID) -> Option<(Arc<Source>, u32)> {
+    pub fn face_source(&self, id: ID) -> Option<(Source, u32)> {
         self.face(id).map(|info| (info.source.clone(), info.index))
     }
 
@@ -431,27 +435,81 @@ impl Database {
         where P: FnOnce(&[u8], u32) -> T
     {
         let (src, face_index) = self.face_source(id)?;
-        match &*src {
-            #[cfg(all(feature = "fs", not(feature="memmap")))]
-            Source::File(ref path) => {
-                let data = std::fs::read(path).ok()?;
+        src.with_data(|data| p(data, face_index))        
+    }
 
-                Some(p(&data, face_index))
-            }
-            #[cfg(all(feature = "fs", feature="memmap"))]
+    /// Makes the font data that backs the specified face id shared so that the application can
+    /// hold a reference to it.
+    ///
+    /// # Safety
+    ///
+    /// If the face originates from a file from disk, then the file is mapped from disk. This is unsafe as
+    /// another process may make changes to the file on disk, which may become visible in this process'
+    /// mapping and possibly cause crashes.
+    ///
+    /// If the underlying font provides multiple faces, then all faces are updated to participate in
+    /// the data sharing. If the face was previously marked for data sharing, then this function will
+    /// return a clone of the existing reference.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
+    pub unsafe fn make_shared_face_data(&mut self, id: ID) -> Option<(Arc<dyn AsRef<[u8]> + Send + Sync>, u32)> {
+        let face_info = self.faces.iter().find(|item| item.id == id)?;
+        let face_index = face_info.index;
+
+        let old_source = face_info.source.clone();
+
+        let (path, shared_data) = match &old_source {
+            Source::Binary(data) => {
+                return Some((data.clone(), face_index));
+            },
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
-                let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+                let shared_data = Arc::new(memmap2::MmapOptions::new().map(&file).ok()?) as Arc<dyn AsRef<[u8]> + Send + Sync>;
+                (path.clone(), shared_data)
+            }
+            Source::SharedFile(_, data) => {
+                return Some((data.clone(), face_index));
+            }
+        };
 
-                Some(p(data, face_index))
+        let shared_source = Source::SharedFile(path.clone(), shared_data.clone());
+
+        self.faces.iter_mut().for_each(|face| {
+
+            if matches!(&face.source, Source::File(old_path) if old_path == &path) {
+                face.source = shared_source.clone();
             }
-            Source::Binary(ref data) => {
-                Some(p(data, face_index))
+        });
+
+        Some((shared_data, face_index))
+    }
+
+    /// Transfers ownership of shared font data back to the font database. This is the reverse operation
+    /// of [`Self::make_shared_face_data`]. If the font data belonging to the specified face is mapped
+    /// from a file on disk, then that mapping is closed and the data becomes private to the process again.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
+    pub fn make_face_data_unshared(&mut self, id: ID) {
+        let face_info = match self.faces.iter().find(|item| item.id == id) {
+            Some(face_info) => face_info,
+            None => return,
+        };
+
+        let old_source = face_info.source.clone();
+
+        let shared_path = match old_source {
+            #[cfg(all(feature = "fs", feature = "memmap"))]
+            Source::SharedFile(path, _) => path.clone(),
+            _ => return,
+        };
+
+        let new_source = Source::File(shared_path.clone());
+
+        self.faces.iter_mut().for_each(|face| {
+            if matches!(&face.source, Source::SharedFile(path, ..) if path == &shared_path) {
+                face.source = new_source.clone();
             }
-        }
+        });
     }
 }
-
 
 /// A single font face info.
 ///
@@ -465,9 +523,9 @@ pub struct FaceInfo {
 
     /// A font source.
     ///
-    /// We have to use `Rc`, because multiple `FaceInfo` objects can reference
-    /// the same data in case of font collections.
-    pub source: Arc<Source>,
+    /// Note that multiple `FaceInfo` objects can reference the same data in case of
+    /// font collections, which means that they'll use the same Source.
+    pub source: Source,
 
     /// A face index in the `source`.
     pub index: u32,
@@ -514,16 +572,67 @@ struct FaceProperties {
 /// Either a raw binary data or a file path.
 ///
 /// Stores the whole font and not just a single face.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Source {
-    /// A font's raw data. Owned by the database.
-    Binary(Vec<u8>),
+    /// A font's raw data, typically backed by a Vec<u8>.
+    Binary(Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's path.
     #[cfg(feature = "fs")]
     File(PathBuf),
+
+    /// A font's raw data originating from a shared file mapping.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
+    SharedFile(PathBuf, Arc<dyn AsRef<[u8]> + Sync + Send>),
 }
 
+impl std::fmt::Debug for Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Binary(arg0) => f
+                .debug_tuple("SharedBinary")
+                .field(&arg0.as_ref().as_ref())
+                .finish(),
+            #[cfg(feature = "fs")]
+            Self::File(arg0) => f.debug_tuple("File").field(arg0).finish(),
+            #[cfg(all(feature = "fs", feature = "memmap"))]
+            Self::SharedFile(arg0, arg1) => f
+                .debug_tuple("SharedFile")
+                .field(arg0)
+                .field(&arg1.as_ref().as_ref())
+                .finish(),
+        }
+    }
+}
+
+impl Source {    
+    fn with_data<P, T>(&self, p: P) -> Option<T>
+        where P: FnOnce(&[u8]) -> T
+    {
+        match &self {
+            #[cfg(all(feature = "fs", not(feature="memmap")))]
+            Source::File(ref path) => {
+                let data = std::fs::read(path).ok()?;
+
+                Some(p(&data))
+            }
+            #[cfg(all(feature = "fs", feature="memmap"))]
+            Source::File(ref path) => {
+                let file = std::fs::File::open(path).ok()?;
+                let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+
+                Some(p(data))
+            }
+            Source::Binary(ref data) => {
+                Some(p(data.as_ref().as_ref()))
+            },
+            #[cfg(all(feature = "fs", feature = "memmap"))]
+            Source::SharedFile(_, ref data) => {
+                Some(p(data.as_ref().as_ref()))
+            }
+        }   
+    }
+}
 
 /// A database query.
 ///
@@ -634,7 +743,7 @@ impl Default for Style {
 
 fn parse_face_info(
     id: u32,
-    source: Arc<Source>,
+    source: Source,
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
