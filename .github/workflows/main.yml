@@ -24,11 +24,14 @@ jobs:
         toolchain: ${{ matrix.rust }}
         override: true
 
-    - name: Install cargo-all-features
-      run: cargo install cargo-all-features
+    - name: Build without default features
+      run: cargo build --no-default-features
 
-    - name: Build all feature combinations
-      run: cargo build-all-features
+    - name: Build with fs
+      run: cargo build --no-default-features --features fs
+
+    - name: Build with memmap
+      run: cargo build --no-default-features --features memmap
 
     - name: Run tests
       run: cargo test
