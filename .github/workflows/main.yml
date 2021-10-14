@@ -7,15 +7,22 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         rust:
-          - stable
           - 1.35.0
+          - stable
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+
+    - name: Install toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.rust }}
+        override: true
 
     - name: Install cargo-all-features
       run: cargo install cargo-all-features
