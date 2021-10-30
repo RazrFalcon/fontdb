@@ -283,6 +283,23 @@ impl Database {
         // Linux.
         #[cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))]
         {
+            #[cfg(feature = "fontconfig")]
+            {
+                let mut fontconfig = fontconfig_parser::FontConfig::default();
+                match fontconfig.merge_config("/etc/fonts/fonts.conf") {
+                    Ok(_) => {
+                        for dir in fontconfig.dirs {
+                            self.load_fonts_dir(dir.path);
+                        }
+
+                        return;
+                    }
+                    Err(err) => {
+                        log::error!("fontconfig parse error: {}", err);
+                    }
+                }
+            }
+
             self.load_fonts_dir("/usr/share/fonts/");
             self.load_fonts_dir("/usr/local/share/fonts/");
 
