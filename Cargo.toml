@@ -1,6 +1,6 @@
 [package]
 name = "fontdb"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Evgeniy Reizner <razrfalcon@gmail.com>"]
 edition = "2018"
 description = "A simple, in-memory font database with CSS-like queries."
@@ -14,13 +14,13 @@ categories = ["text-processing"]
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.5", optional = true }
-ttf-parser = "0.12.1"
+ttf-parser = "0.14"
 
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))'.dependencies]
 fontconfig-parser = { version = "0.5", optional = true, default-features = false }
 
 [dev-dependencies]
-env_logger = { version = "0.8", default-features = false }
+env_logger = { version = "0.9", default-features = false }
 
 [features]
 default = ["fs", "memmap"]

@@ -799,16 +799,16 @@ fn parse_face_info(
 }
 
 fn parse_name(name_id: u16, face: &ttf_parser::Face) -> Option<String> {
-    let name_record = face.names().find(|name| {
-        name.name_id() == name_id && name.is_supported_encoding()
+    let name_record = face.names().into_iter().find(|name| {
+        name.name_id == name_id && name.is_supported_encoding()
     })?;
 
     if name_record.is_unicode() {
         name_record.to_string()
     } else if name_record.is_mac_roman() {
         // We support only MacRoman encoding here, which should be enough in most cases.
-        let mut raw_data = Vec::with_capacity(name_record.name().len());
-        for b in name_record.name() {
+        let mut raw_data = Vec::with_capacity(name_record.name.len());
+        for b in name_record.name {
             raw_data.push(MAC_ROMAN[*b as usize]);
         }
 
@@ -823,14 +823,14 @@ trait NameExt {
     fn is_supported_encoding(&self) -> bool;
 }
 
-impl NameExt for ttf_parser::Name<'_> {
+impl NameExt for ttf_parser::name::Name<'_> {
     #[inline]
     fn is_mac_roman(&self) -> bool {
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
         const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
 
-           self.platform_id() == ttf_parser::PlatformId::Macintosh
-        && self.encoding_id() == MACINTOSH_ROMAN_ENCODING_ID
+           self.platform_id == ttf_parser::PlatformId::Macintosh
+        && self.encoding_id == MACINTOSH_ROMAN_ENCODING_ID
     }
 
     #[inline]

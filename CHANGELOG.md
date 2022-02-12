@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.8.0] - 2022-02-12
 ### Added
 - Load user fonts on Windows.
 - `fontconfig` feature to allow retrieving font dirs from the fontconfig config file
@@ -74,7 +76,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/RazrFalcon/fontdb/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RazrFalcon/fontdb/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/RazrFalcon/fontdb/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/RazrFalcon/fontdb/compare/v0.6.0...v0.6.1
