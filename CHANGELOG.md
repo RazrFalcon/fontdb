@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- Load user fonts on Windows.
+- `fontconfig` feature to allow retrieving font dirs from the fontconfig config file
+  instead of using hardcoded paths. Linux-only. [@Riey](https://github.com/Riey)
 
 ## [0.7.0] - 2021-10-04
 ### Changed

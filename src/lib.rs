@@ -265,6 +265,12 @@ impl Database {
         #[cfg(target_os = "windows")]
         {
             self.load_fonts_dir("C:\\Windows\\Fonts\\");
+
+            if let Ok(ref home) = std::env::var("USERPROFILE") {
+                let home_path = std::path::Path::new(home);
+                self.load_fonts_dir(home_path.join("AppData\\Local\\Microsoft\\Windows\\Fonts"));
+                self.load_fonts_dir(home_path.join("AppData\\Roaming\\Microsoft\\Windows\\Fonts"));
+            }
         }
 
         #[cfg(target_os = "macos")]
@@ -275,8 +281,8 @@ impl Database {
             self.load_fonts_dir("/Network/Library/Fonts");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let path = std::path::Path::new(home).join("Library/Fonts");
-                self.load_fonts_dir(path);
+                let home_path = std::path::Path::new(home);
+                self.load_fonts_dir(home_path.join("Library/Fonts"));
             }
         }
 
@@ -292,10 +298,12 @@ impl Database {
                             self.load_fonts_dir(dir.path);
                         }
 
+                        // Yes, stop here. No need to load fonts from hardcoded paths.
                         return;
                     }
                     Err(err) => {
-                        log::error!("fontconfig parse error: {}", err);
+                        // Fontconfig parsing failed? Try to load fonts from hardcoded paths then.
+                        warn!("Failed to parse fontconfig because: {}", err);
                     }
                 }
             }
