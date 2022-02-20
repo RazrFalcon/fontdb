@@ -55,6 +55,9 @@ On Mac Mini M1 it takes just 9ms to load 898 fonts.
 The library relies on memory-mapped files, which is inherently unsafe.
 But since we do not keep the files open it should be perfectly safe.
 
+If you would like to use a persistent memory mapping of the font files,
+then you can use the unsafe [`Database::make_shared_face_data`] function.
+
 ## License
 
 MIT
