@@ -770,20 +770,10 @@ fn parse_face_info(
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
-    let face = ttf_parser::Face::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
-
-    let family = parse_name(ttf_parser::name_id::FAMILY, &face).ok_or(LoadError::UnnamedFont)?;
-
-    let post_script_name = parse_name(ttf_parser::name_id::POST_SCRIPT_NAME, &face)
-        .ok_or(LoadError::UnnamedFont)?;
-
-    let style = if face.is_italic() {
-        Style::Italic
-    } else if face.is_oblique() {
-        Style::Oblique
-    } else {
-        Style::Normal
-    };
+    let raw_face = ttf_parser::RawFace::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
+    let (family, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
+    let (style, weight, stretch) = parse_os2(&raw_face);
+    let monospaced = parse_post(&raw_face);
 
     Ok(FaceInfo {
         id: ID(id),
@@ -792,14 +782,23 @@ fn parse_face_info(
         family,
         post_script_name,
         style,
-        weight: Weight(face.weight().to_number()),
-        stretch: face.width(),
-        monospaced: face.is_monospaced(),
+        weight,
+        stretch,
+        monospaced,
     })
 }
 
-fn parse_name(name_id: u16, face: &ttf_parser::Face) -> Option<String> {
-    let name_record = face.names().into_iter().find(|name| {
+fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(String, String)> {
+    const NAME_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"name");
+    let name_data = raw_face.table(NAME_TAG)?;
+    let name_table = ttf_parser::name::Table::parse(name_data)?;
+    let family_name = parse_name_record(&name_table, ttf_parser::name_id::FAMILY)?;
+    let pst_script_name = parse_name_record(&name_table, ttf_parser::name_id::POST_SCRIPT_NAME)?;
+    Some((family_name, pst_script_name))
+}
+
+fn parse_name_record(name_table: &ttf_parser::name::Table, name_id: u16) -> Option<String> {
+    let name_record = name_table.names.into_iter().find(|name| {
         name.name_id == name_id && name.is_supported_encoding()
     })?;
 
@@ -816,6 +815,39 @@ fn parse_name(name_id: u16, face: &ttf_parser::Face) -> Option<String> {
     } else {
         None
     }
+}
+
+fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
+    const OS2_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"OS/2");
+    let table = match raw_face.table(OS2_TAG).and_then(ttf_parser::os2::Table::parse) {
+        Some(table) => table,
+        None => return (Style::Normal, Weight::NORMAL, Stretch::Normal),
+    };
+
+    let style = match table.style() {
+        ttf_parser::Style::Normal => Style::Normal,
+        ttf_parser::Style::Italic => Style::Italic,
+        ttf_parser::Style::Oblique => Style::Oblique,
+    };
+
+    let weight = table.weight();
+    let stretch = table.width();
+
+    (style, Weight(weight.to_number()), stretch)
+}
+
+fn parse_post(raw_face: &ttf_parser::RawFace) -> bool {
+    // We need just a single value from the `post` table, while ttf-parser will parse all.
+    // Therefore we have a custom parser.
+
+    const POST_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"post");
+    let data = match raw_face.table(POST_TAG) {
+        Some(v) => v,
+        None => return false,
+    };
+
+    // All we care about, it that u32 at offset 12 is non-zero.
+    data.get(12..16) != Some(&[0, 0, 0, 0])
 }
 
 trait NameExt {

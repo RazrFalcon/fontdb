@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- Way faster fonts scanning by using a more low-level `ttf-parser` API
+  which allows us to parse only required TrueType tables.
+  On my hardware, `load_system_fonts()` loaded 898 fonts in 9ms instead of 11ms in the release mode
+  and in 35ms instead of 52ms in debug.
+  Currently, we're parsing only `name`, `OS/2` and `post` tables.
 
 ## [0.8.0] - 2022-02-12
 ### Added

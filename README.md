@@ -48,13 +48,15 @@ On my machine with Samsung SSD 860 and Gentoo Linux, it takes ~20ms
 to load 1906 font faces (most of them are from Google Noto collection)
 with a hot disk cache and ~860ms with a cold one.
 
+On Mac Mini M1 it takes just 9ms to load 898 fonts.
+
 ## Safety
 
 The library relies on memory-mapped files, which is inherently unsafe.
-But we do not keep such files open forever. Instead, we are memory-mapping files only when needed.
-
-[ttf-parser]: https://github.com/RazrFalcon/ttf-parser
+But since we do not keep the files open it should be perfectly safe.
 
 ## License
 
 MIT
+
+[ttf-parser]: https://github.com/RazrFalcon/ttf-parser
