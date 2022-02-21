@@ -218,13 +218,16 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     #[cfg(all(feature = "fs", not(feature = "memmap")))]
-    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+    pub fn load_font_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
         self.load_font_file_impl(path.as_ref())
     }
 
     // A non-generic version.
     #[cfg(all(feature = "fs", not(feature = "memmap")))]
-    fn load_font_file_impl(&mut self, path: &Path) -> Result<(), std::io::Error> {
+    fn load_font_file_impl(&mut self, path: &std::path::Path) -> Result<(), std::io::Error> {
         let data = std::fs::read(path)?;
 
         self.load_fonts_from_file(path, &data);
