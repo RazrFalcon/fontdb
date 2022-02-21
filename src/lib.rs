@@ -60,12 +60,7 @@ then you can use the unsafe [`Database::make_shared_face_data`] function.
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
 
-#[cfg(feature = "fs")] use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
-use log::warn;
 pub use ttf_parser::Width as Stretch;
-
 
 /// A unique per database face ID.
 ///
@@ -79,7 +74,6 @@ pub use ttf_parser::Width as Stretch;
 /// load more than 4 billion font faces.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
 pub struct ID(u32);
-
 
 /// A list of possible font loading errors.
 #[derive(Debug)]
@@ -111,7 +105,6 @@ impl std::fmt::Display for LoadError {
         }
     }
 }
-
 
 /// A font database.
 #[derive(Clone, Debug)]
@@ -155,20 +148,24 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        self.load_font_source(Source::Binary(Arc::new(data)))
+        self.load_font_source(Source::Binary(std::sync::Arc::new(data)))
     }
 
     /// Loads a font from the given source into the `Database`.
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_source(&mut self, source: Source) {
-        source.with_data(|data|{
+        source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
             for index in 0..n {
                 self.next_id = self.next_id.checked_add(1).unwrap();
                 match parse_face_info(self.next_id, source.clone(), &data, index) {
                     Ok(info) => self.faces.push(info),
-                    Err(e) => warn!("Failed to load a font face {} from source cause {}.", index, e),
+                    Err(e) => log::warn!(
+                        "Failed to load a font face {} from source cause {}.",
+                        index,
+                        e
+                    ),
                 }
             }
         });
@@ -176,7 +173,7 @@ impl Database {
 
     /// Backend function used by load_font_file to load font files.
     #[cfg(feature = "fs")]
-    fn load_fonts_from_file(&mut self, path: &Path, data : &[u8]) {
+    fn load_fonts_from_file(&mut self, path: &std::path::Path, data: &[u8]) {
         let source = Source::File(path.into());
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
@@ -185,8 +182,12 @@ impl Database {
             match parse_face_info(self.next_id, source.clone(), data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => {
-                    warn!("Failed to load a font face {} from '{}' cause {}.",
-                          index, path.display(), e)
+                    log::warn!(
+                        "Failed to load a font face {} from '{}' cause {}.",
+                        index,
+                        path.display(),
+                        e
+                    )
                 }
             }
         }
@@ -196,15 +197,18 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     #[cfg(all(feature = "fs", feature = "memmap"))]
-    pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+    pub fn load_font_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
         self.load_font_file_impl(path.as_ref())
     }
 
     // A non-generic version.
     #[cfg(all(feature = "fs", feature = "memmap"))]
-    fn load_font_file_impl(&mut self, path: &Path) -> Result<(), std::io::Error> {
+    fn load_font_file_impl(&mut self, path: &std::path::Path) -> Result<(), std::io::Error> {
         let file = std::fs::File::open(path)?;
-        let data : &[u8] = unsafe { &memmap2::MmapOptions::new().map(&file)? };
+        let data: &[u8] = unsafe { &memmap2::MmapOptions::new().map(&file)? };
 
         self.load_fonts_from_file(path, data);
         Ok(())
@@ -236,13 +240,14 @@ impl Database {
     /// Unlike other `load_*` methods, this one doesn't return an error.
     /// It will simply skip malformed fonts and will print a warning into the log for each of them.
     #[cfg(feature = "fs")]
-    pub fn load_fonts_dir<P: AsRef<Path>>(&mut self, dir: P) {
+    pub fn load_fonts_dir<P: AsRef<std::path::Path>>(&mut self, dir: P) {
         self.load_fonts_dir_impl(dir.as_ref())
     }
 
     // A non-generic version.
+    #[rustfmt::skip] // keep extensions match as is
     #[cfg(feature = "fs")]
-    fn load_fonts_dir_impl(&mut self, dir: &Path) {
+    fn load_fonts_dir_impl(&mut self, dir: &std::path::Path) {
         let fonts_dir = match std::fs::read_dir(dir) {
             Ok(dir) => dir,
             Err(_) => return,
@@ -256,7 +261,7 @@ impl Database {
                         Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
                         Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
                             if let Err(e) = self.load_font_file(&path) {
-                                warn!("Failed to load '{}' cause {}.", path.display(), e);
+                                log::warn!("Failed to load '{}' cause {}.", path.display(), e);
                             }
                         }
                         _ => {}
@@ -286,7 +291,7 @@ impl Database {
             self.load_fonts_dir("C:\\Windows\\Fonts\\");
 
             if let Ok(ref home) = std::env::var("USERPROFILE") {
-                let home_path = Path::new(home);
+                let home_path = std::path::Path::new(home);
                 self.load_fonts_dir(home_path.join("AppData\\Local\\Microsoft\\Windows\\Fonts"));
                 self.load_fonts_dir(home_path.join("AppData\\Roaming\\Microsoft\\Windows\\Fonts"));
             }
@@ -300,7 +305,7 @@ impl Database {
             self.load_fonts_dir("/Network/Library/Fonts");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = Path::new(home);
+                let home_path = std::path::Path::new(home);
                 self.load_fonts_dir(home_path.join("Library/Fonts"));
             }
         }
@@ -322,7 +327,7 @@ impl Database {
                     }
                     Err(err) => {
                         // Fontconfig parsing failed? Try to load fonts from hardcoded paths then.
-                        warn!("Failed to parse fontconfig because: {}", err);
+                        log::warn!("Failed to parse fontconfig because: {}", err);
                     }
                 }
             }
@@ -331,7 +336,7 @@ impl Database {
             self.load_fonts_dir("/usr/local/share/fonts/");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = Path::new(home);
+                let home_path = std::path::Path::new(home);
                 self.load_fonts_dir(home_path.join(".fonts"));
                 self.load_fonts_dir(home_path.join(".local/share/fonts"));
             }
@@ -400,7 +405,9 @@ impl Database {
     pub fn query(&self, query: &Query) -> Option<ID> {
         for family in query.families {
             let name = self.family_name(family);
-            let candidates: Vec<_> = self.faces.iter()
+            let candidates: Vec<_> = self
+                .faces
+                .iter()
                 .filter(|face| &face.family == name)
                 .collect();
 
@@ -466,7 +473,8 @@ impl Database {
     /// })?;
     /// ```
     pub fn with_face_data<P, T>(&self, id: ID, p: P) -> Option<T>
-        where P: FnOnce(&[u8], u32) -> T
+    where
+        P: FnOnce(&[u8], u32) -> T,
     {
         let (src, face_index) = self.face_source(id)?;
         src.with_data(|data| p(data, face_index))
@@ -485,7 +493,10 @@ impl Database {
     /// the data sharing. If the face was previously marked for data sharing, then this function will
     /// return a clone of the existing reference.
     #[cfg(all(feature = "fs", feature = "memmap"))]
-    pub unsafe fn make_shared_face_data(&mut self, id: ID) -> Option<(Arc<dyn AsRef<[u8]> + Send + Sync>, u32)> {
+    pub unsafe fn make_shared_face_data(
+        &mut self,
+        id: ID,
+    ) -> Option<(std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>, u32)> {
         let face_info = self.faces.iter().find(|item| item.id == id)?;
         let face_index = face_info.index;
 
@@ -494,10 +505,11 @@ impl Database {
         let (path, shared_data) = match &old_source {
             Source::Binary(data) => {
                 return Some((data.clone(), face_index));
-            },
+            }
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
-                let shared_data = Arc::new(memmap2::MmapOptions::new().map(&file).ok()?) as Arc<dyn AsRef<[u8]> + Send + Sync>;
+                let shared_data = std::sync::Arc::new(memmap2::MmapOptions::new().map(&file).ok()?)
+                    as std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>;
                 (path.clone(), shared_data)
             }
             Source::SharedFile(_, data) => {
@@ -508,7 +520,6 @@ impl Database {
         let shared_source = Source::SharedFile(path.clone(), shared_data.clone());
 
         self.faces.iter_mut().for_each(|face| {
-
             if matches!(&face.source, Source::File(old_path) if old_path == &path) {
                 face.source = shared_source.clone();
             }
@@ -591,7 +602,6 @@ pub struct FaceInfo {
     pub monospaced: bool,
 }
 
-
 /// A font source.
 ///
 /// Either a raw binary data or a file path.
@@ -600,15 +610,18 @@ pub struct FaceInfo {
 #[derive(Clone)]
 pub enum Source {
     /// A font's raw data, typically backed by a Vec<u8>.
-    Binary(Arc<dyn AsRef<[u8]> + Sync + Send>),
+    Binary(std::sync::Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's path.
     #[cfg(feature = "fs")]
-    File(PathBuf),
+    File(std::path::PathBuf),
 
     /// A font's raw data originating from a shared file mapping.
     #[cfg(all(feature = "fs", feature = "memmap"))]
-    SharedFile(PathBuf, Arc<dyn AsRef<[u8]> + Sync + Send>),
+    SharedFile(
+        std::path::PathBuf,
+        std::sync::Arc<dyn AsRef<[u8]> + Sync + Send>,
+    ),
 }
 
 impl std::fmt::Debug for Source {
@@ -632,29 +645,26 @@ impl std::fmt::Debug for Source {
 
 impl Source {
     fn with_data<P, T>(&self, p: P) -> Option<T>
-        where P: FnOnce(&[u8]) -> T
+    where
+        P: FnOnce(&[u8]) -> T,
     {
         match &self {
-            #[cfg(all(feature = "fs", not(feature="memmap")))]
+            #[cfg(all(feature = "fs", not(feature = "memmap")))]
             Source::File(ref path) => {
                 let data = std::fs::read(path).ok()?;
 
                 Some(p(&data))
             }
-            #[cfg(all(feature = "fs", feature="memmap"))]
+            #[cfg(all(feature = "fs", feature = "memmap"))]
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
                 let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
 
                 Some(p(data))
             }
-            Source::Binary(ref data) => {
-                Some(p(data.as_ref().as_ref()))
-            },
+            Source::Binary(ref data) => Some(p(data.as_ref().as_ref())),
             #[cfg(all(feature = "fs", feature = "memmap"))]
-            Source::SharedFile(_, ref data) => {
-                Some(p(data.as_ref().as_ref()))
-            }
+            Source::SharedFile(_, ref data) => Some(p(data.as_ref().as_ref())),
         }
     }
 }
@@ -685,7 +695,6 @@ pub struct Query<'a> {
     pub style: Style,
 }
 
-
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -712,7 +721,6 @@ pub enum Family<'a> {
     /// The sole criterion of a monospace font is that all glyphs have the same fixed width.
     Monospace,
 }
-
 
 /// Specifies the weight of glyphs in the font, their degree of blackness or stroke thickness.
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug, Hash)]
@@ -746,7 +754,6 @@ impl Weight {
     pub const BLACK: Weight = Weight(900);
 }
 
-
 /// Allows italic or oblique faces to be selected.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Style {
@@ -765,14 +772,14 @@ impl Default for Style {
     }
 }
 
-
 fn parse_face_info(
     id: u32,
     source: Source,
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
-    let raw_face = ttf_parser::RawFace::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
+    let raw_face =
+        ttf_parser::RawFace::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (family, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
     let (style, weight, stretch) = parse_os2(&raw_face);
     let monospaced = parse_post(&raw_face);
@@ -800,9 +807,10 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(String, String)> {
 }
 
 fn parse_name_record(name_table: &ttf_parser::name::Table, name_id: u16) -> Option<String> {
-    let name_record = name_table.names.into_iter().find(|name| {
-        name.name_id == name_id && name.is_supported_encoding()
-    })?;
+    let name_record = name_table
+        .names
+        .into_iter()
+        .find(|name| name.name_id == name_id && name.is_supported_encoding())?;
 
     if name_record.is_unicode() {
         name_record.to_string()
@@ -821,7 +829,10 @@ fn parse_name_record(name_table: &ttf_parser::name::Table, name_id: u16) -> Opti
 
 fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
     const OS2_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"OS/2");
-    let table = match raw_face.table(OS2_TAG).and_then(ttf_parser::os2::Table::parse) {
+    let table = match raw_face
+        .table(OS2_TAG)
+        .and_then(ttf_parser::os2::Table::parse)
+    {
         Some(table) => table,
         None => return (Style::Normal, Weight::NORMAL, Stretch::Normal),
     };
@@ -860,11 +871,11 @@ trait NameExt {
 impl NameExt for ttf_parser::name::Name<'_> {
     #[inline]
     fn is_mac_roman(&self) -> bool {
+        use ttf_parser::PlatformId::Macintosh;
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
         const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
 
-           self.platform_id == ttf_parser::PlatformId::Macintosh
-        && self.encoding_id == MACINTOSH_ROMAN_ENCODING_ID
+        self.platform_id == Macintosh && self.encoding_id == MACINTOSH_ROMAN_ENCODING_ID
     }
 
     #[inline]
@@ -872,7 +883,6 @@ impl NameExt for ttf_parser::name::Name<'_> {
         self.is_unicode() || self.is_mac_roman()
     }
 }
-
 
 // https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-style-matching
 // Based on https://github.com/servo/font-kit
@@ -884,7 +894,9 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     let mut matching_set: Vec<usize> = (0..candidates.len()).collect();
 
     // Step 4a (`font-stretch`).
-    let matches = matching_set.iter().any(|&index| candidates[index].stretch == query.stretch);
+    let matches = matching_set
+        .iter()
+        .any(|&index| candidates[index].stretch == query.stretch);
     let matching_stretch = if matches {
         // Exact match.
         query.stretch
@@ -900,11 +912,9 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
         match stretch {
             Some(&matching_index) => candidates[matching_index].stretch,
             None => {
-                let matching_index = *matching_set
-                    .iter()
-                    .min_by_key(|&&index| {
-                        candidates[index].stretch.to_number() - query.stretch.to_number()
-                    })?;
+                let matching_index = *matching_set.iter().min_by_key(|&&index| {
+                    candidates[index].stretch.to_number() - query.stretch.to_number()
+                })?;
 
                 candidates[matching_index].stretch
             }
@@ -921,11 +931,9 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
         match stretch {
             Some(&matching_index) => candidates[matching_index].stretch,
             None => {
-                let matching_index = *matching_set
-                    .iter()
-                    .min_by_key(|&&index| {
-                        query.stretch.to_number() - candidates[index].stretch.to_number()
-                    })?;
+                let matching_index = *matching_set.iter().min_by_key(|&&index| {
+                    query.stretch.to_number() - candidates[index].stretch.to_number()
+                })?;
 
                 candidates[matching_index].stretch
             }
@@ -958,14 +966,17 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     let matches = weight >= 400
         && weight < 450
         && matching_set
-        .iter()
-        .any(|&index| candidates[index].weight.0 == 500);
+            .iter()
+            .any(|&index| candidates[index].weight.0 == 500);
 
     let matching_weight = if matches {
         // Check 500 first.
         Weight::MEDIUM
-    } else if weight >= 450 && weight <= 500 &&
-        matching_set.iter().any(|&index| candidates[index].weight.0 == 400)
+    } else if weight >= 450
+        && weight <= 500
+        && matching_set
+            .iter()
+            .any(|&index| candidates[index].weight.0 == 400)
     {
         // Check 400 first.
         Weight::NORMAL
@@ -1010,10 +1021,10 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     matching_set.into_iter().next()
 }
 
-
 /// Macintosh Roman to UTF-16 encoding table.
 ///
 /// https://en.wikipedia.org/wiki/Mac_OS_Roman
+#[rustfmt::skip]
 const MAC_ROMAN: &[u16; 256] = &[
     0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
     0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F,

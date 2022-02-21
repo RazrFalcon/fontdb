@@ -10,7 +10,11 @@ fn main() {
     db.set_cursive_family("Comic Sans MS");
     db.set_fantasy_family("Impact");
     db.set_monospace_family("Courier New");
-    println!("Loaded {} font faces in {}ms.", db.len(), now.elapsed().as_millis());
+    println!(
+        "Loaded {} font faces in {}ms.",
+        db.len(),
+        now.elapsed().as_millis()
+    );
 
     const FAMILY_NAME: &str = "Times New Roman";
     let query = fontdb::Query {
@@ -24,8 +28,12 @@ fn main() {
         Some(id) => {
             let (src, index) = db.face_source(id).unwrap();
             if let fontdb::Source::File(ref path) = &src {
-                println!("Font '{}':{} found in {}ms.", path.display(), index,
-                         now.elapsed().as_micros() as f64 / 1000.0);
+                println!(
+                    "Font '{}':{} found in {}ms.",
+                    path.display(),
+                    index,
+                    now.elapsed().as_micros() as f64 / 1000.0
+                );
             }
         }
         None => {
