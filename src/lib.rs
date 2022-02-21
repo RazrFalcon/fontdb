@@ -174,9 +174,9 @@ impl Database {
         });
     }
 
-    /// Backend function used by load_font_file to load font files
+    /// Backend function used by load_font_file to load font files.
     #[cfg(feature = "fs")]
-    fn load_fonts_from_file(&mut self, path: &std::path::Path, data : &[u8]) {
+    fn load_fonts_from_file(&mut self, path: &Path, data : &[u8]) {
         let source = Source::File(path.into());
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
@@ -197,10 +197,16 @@ impl Database {
     /// Will load all font faces in case of a font collection.
     #[cfg(all(feature = "fs", feature = "memmap"))]
     pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
-        let file = std::fs::File::open(path.as_ref())?;
+        self.load_font_file_impl(path.as_ref())
+    }
+
+    // A non-generic version.
+    #[cfg(all(feature = "fs", feature = "memmap"))]
+    fn load_font_file_impl(&mut self, path: &Path) -> Result<(), std::io::Error> {
+        let file = std::fs::File::open(path)?;
         let data : &[u8] = unsafe { &memmap2::MmapOptions::new().map(&file)? };
 
-        self.load_fonts_from_file(path.as_ref(), data);
+        self.load_fonts_from_file(path, data);
         Ok(())
     }
 
@@ -209,9 +215,15 @@ impl Database {
     /// Will load all font faces in case of a font collection.
     #[cfg(all(feature = "fs", not(feature = "memmap")))]
     pub fn load_font_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
-        let data = std::fs::read(path.as_ref())?;
+        self.load_font_file_impl(path.as_ref())
+    }
 
-        self.load_fonts_from_file(path.as_ref(), &data);
+    // A non-generic version.
+    #[cfg(all(feature = "fs", not(feature = "memmap")))]
+    fn load_font_file_impl(&mut self, path: &Path) -> Result<(), std::io::Error> {
+        let data = std::fs::read(path)?;
+
+        self.load_fonts_from_file(path, &data);
         Ok(())
     }
 
@@ -225,7 +237,13 @@ impl Database {
     /// It will simply skip malformed fonts and will print a warning into the log for each of them.
     #[cfg(feature = "fs")]
     pub fn load_fonts_dir<P: AsRef<Path>>(&mut self, dir: P) {
-        let fonts_dir = match std::fs::read_dir(dir.as_ref()) {
+        self.load_fonts_dir_impl(dir.as_ref())
+    }
+
+    // A non-generic version.
+    #[cfg(feature = "fs")]
+    fn load_fonts_dir_impl(&mut self, dir: &Path) {
+        let fonts_dir = match std::fs::read_dir(dir) {
             Ok(dir) => dir,
             Err(_) => return,
         };
@@ -268,7 +286,7 @@ impl Database {
             self.load_fonts_dir("C:\\Windows\\Fonts\\");
 
             if let Ok(ref home) = std::env::var("USERPROFILE") {
-                let home_path = std::path::Path::new(home);
+                let home_path = Path::new(home);
                 self.load_fonts_dir(home_path.join("AppData\\Local\\Microsoft\\Windows\\Fonts"));
                 self.load_fonts_dir(home_path.join("AppData\\Roaming\\Microsoft\\Windows\\Fonts"));
             }
@@ -282,7 +300,7 @@ impl Database {
             self.load_fonts_dir("/Network/Library/Fonts");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = std::path::Path::new(home);
+                let home_path = Path::new(home);
                 self.load_fonts_dir(home_path.join("Library/Fonts"));
             }
         }
@@ -313,7 +331,7 @@ impl Database {
             self.load_fonts_dir("/usr/local/share/fonts/");
 
             if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = std::path::Path::new(home);
+                let home_path = Path::new(home);
                 self.load_fonts_dir(home_path.join(".fonts"));
                 self.load_fonts_dir(home_path.join(".local/share/fonts"));
             }
