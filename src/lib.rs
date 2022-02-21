@@ -400,21 +400,13 @@ impl Database {
     pub fn query(&self, query: &Query) -> Option<ID> {
         for family in query.families {
             let name = self.family_name(family);
-
-            let mut ids = Vec::new();
-            let mut candidates = Vec::new();
-            for face in self.faces.iter().filter(|face| &face.family == name) {
-                ids.push(face.id);
-                candidates.push(FaceProperties {
-                    style: face.style,
-                    weight: face.weight,
-                    stretch: face.stretch,
-                });
-            }
+            let candidates: Vec<_> = self.faces.iter()
+                .filter(|face| &face.family == name)
+                .collect();
 
             if !candidates.is_empty() {
                 if let Some(index) = find_best_match(&candidates, query) {
-                    return Some(ids[index]);
+                    return Some(candidates[index].id);
                 }
             }
         }
@@ -597,15 +589,6 @@ pub struct FaceInfo {
 
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
-}
-
-
-/// CSS-related face properties.
-#[derive(Clone, Copy, PartialEq, Default, Debug)]
-struct FaceProperties {
-    style: Style,
-    weight: Weight,
-    stretch: Stretch,
 }
 
 
@@ -894,7 +877,7 @@ impl NameExt for ttf_parser::name::Name<'_> {
 // https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-style-matching
 // Based on https://github.com/servo/font-kit
 #[inline(never)]
-fn find_best_match(candidates: &[FaceProperties], query: &Query) -> Option<usize> {
+fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     debug_assert!(!candidates.is_empty());
 
     // Step 4.
