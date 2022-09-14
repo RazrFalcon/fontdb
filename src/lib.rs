@@ -316,13 +316,21 @@ impl Database {
         // Linux.
         #[cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))]
         {
+            let home = std::env::var("HOME").unwrap_or("~".to_string());
+            let home_path = std::path::Path::new(&home);
+
             #[cfg(feature = "fontconfig")]
             {
                 let mut fontconfig = fontconfig_parser::FontConfig::default();
                 match fontconfig.merge_config("/etc/fonts/fonts.conf") {
                     Ok(_) => {
                         for dir in fontconfig.dirs {
-                            self.load_fonts_dir(dir.path);
+                            let path = if dir.path.starts_with("~") {
+                                home_path.join(dir.path.strip_prefix("~").unwrap())
+                            }else{
+                                dir.path
+                            };
+                            self.load_fonts_dir(path);
                         }
 
                         // Yes, stop here. No need to load fonts from hardcoded paths.
@@ -337,12 +345,8 @@ impl Database {
 
             self.load_fonts_dir("/usr/share/fonts/");
             self.load_fonts_dir("/usr/local/share/fonts/");
-
-            if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = std::path::Path::new(home);
-                self.load_fonts_dir(home_path.join(".fonts"));
-                self.load_fonts_dir(home_path.join(".local/share/fonts"));
-            }
+            self.load_fonts_dir(home_path.join(".fonts"));
+            self.load_fonts_dir(home_path.join(".local/share/fonts"));
         }
     }
 
