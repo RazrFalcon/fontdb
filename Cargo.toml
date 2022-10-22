@@ -14,7 +14,7 @@ categories = ["text-processing"]
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.5", optional = true }
-ttf-parser = "0.15"
+ttf-parser = "0.17"
 
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))'.dependencies]
 fontconfig-parser = { version = "0.5", optional = true, default-features = false }
