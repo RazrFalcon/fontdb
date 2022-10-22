@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- Expand home path `~` prefix during fontconfig paths resolving.
+  [@snoyer](https://github.com/snoyer)
 
 ## [0.9.1] - 2022-02-21
 ### Changed

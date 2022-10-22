@@ -322,7 +322,17 @@ impl Database {
                 match fontconfig.merge_config("/etc/fonts/fonts.conf") {
                     Ok(_) => {
                         for dir in fontconfig.dirs {
-                            self.load_fonts_dir(dir.path);
+                            let path = if dir.path.starts_with("~") {
+                                if let Ok(ref home) = std::env::var("HOME") {
+                                    let home_path = std::path::Path::new(home);
+                                    home_path.join(dir.path.strip_prefix("~").unwrap())
+                                } else {
+                                    continue;
+                                }
+                            } else {
+                                dir.path
+                            };
+                            self.load_fonts_dir(path);
                         }
 
                         // Yes, stop here. No need to load fonts from hardcoded paths.
