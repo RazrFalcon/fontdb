@@ -75,6 +75,16 @@ pub use ttf_parser::Width as Stretch;
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
 pub struct ID(u32);
 
+impl ID {
+    /// Creates a dummy ID.
+    ///
+    /// Should be used in tandem with [`Database::push_face_info`].
+    #[inline]
+    pub fn dummy() -> Self {
+        Self(0)
+    }
+}
+
 /// A list of possible font loading errors.
 #[derive(Debug)]
 enum LoadError {
@@ -131,7 +141,7 @@ impl Database {
     #[inline]
     pub fn new() -> Self {
         Database {
-            next_id: 0,
+            next_id: 1,
             faces: Vec::new(),
             family_serif: "Times New Roman".to_string(),
             family_sans_serif: "Arial".to_string(),
@@ -354,6 +364,18 @@ impl Database {
                 self.load_fonts_dir(home_path.join(".local/share/fonts"));
             }
         }
+    }
+
+    /// Pushes a user-provided `FaceInfo` to the database.
+    ///
+    /// In some cases, a caller might want to ignore the font's metadata and provide their own.
+    /// This method doesn't parse the `source` font.
+    ///
+    /// The `id` field should be set to [`ID::dummy()`] and will be then overwritten by this method.
+    pub fn push_face_info(&mut self, mut info: FaceInfo) {
+        self.next_id = self.next_id.checked_add(1).unwrap();
+        info.id = ID(self.next_id);
+        self.faces.push(info);
     }
 
     /// Removes a font face by `id` from the database.
@@ -791,8 +813,7 @@ fn parse_face_info(
     data: &[u8],
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
-    let raw_face =
-        ttf_parser::RawFace::from_slice(data, index).map_err(|_| LoadError::MalformedFont)?;
+    let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (family, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
     let (style, weight, stretch) = parse_os2(&raw_face);
     let monospaced = parse_post(&raw_face);

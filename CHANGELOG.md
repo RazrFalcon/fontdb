@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- `Database::push_face_info`
+- `ID::dummy`
+
 ### Fixed
 - Expand home path `~` prefix during fontconfig paths resolving.
   [@snoyer](https://github.com/snoyer)
