@@ -456,7 +456,7 @@ impl Database {
         None
     }
 
-    fn family_name<'a>(&'a self, family: &'a Family) -> &'a str {
+    pub fn family_name<'a>(&'a self, family: &'a Family) -> &'a str {
         match family {
             Family::Name(ref name) => name,
             Family::Serif => self.family_serif.as_ref(),
