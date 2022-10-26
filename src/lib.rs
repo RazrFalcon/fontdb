@@ -436,6 +436,20 @@ impl Database {
         self.family_monospace = family.into();
     }
 
+    /// Returns the generic family name or the `Family::Name` itself.
+    ///
+    /// Generic family names should be set via `Database::set_*_family` methods.
+    pub fn family_name<'a>(&'a self, family: &'a Family) -> &'a str {
+        match family {
+            Family::Name(name) => name,
+            Family::Serif => self.family_serif.as_str(),
+            Family::SansSerif => self.family_sans_serif.as_str(),
+            Family::Cursive => self.family_cursive.as_str(),
+            Family::Fantasy => self.family_fantasy.as_str(),
+            Family::Monospace => self.family_monospace.as_str(),
+        }
+    }
+
     /// Performs a CSS-like query and returns the best matched font face.
     pub fn query(&self, query: &Query) -> Option<ID> {
         for family in query.families {
@@ -454,17 +468,6 @@ impl Database {
         }
 
         None
-    }
-
-    pub fn family_name<'a>(&'a self, family: &'a Family) -> &'a str {
-        match family {
-            Family::Name(ref name) => name,
-            Family::Serif => self.family_serif.as_ref(),
-            Family::SansSerif => self.family_sans_serif.as_ref(),
-            Family::Cursive => self.family_cursive.as_ref(),
-            Family::Fantasy => self.family_fantasy.as_ref(),
-            Family::Monospace => self.family_monospace.as_ref(),
-        }
     }
 
     /// Returns a reference to an internal storage.
