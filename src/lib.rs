@@ -56,9 +56,18 @@ then you can use the unsafe [`Database::make_shared_face_data`] function.
 [ttf-parser]: https://github.com/RazrFalcon/ttf-parser
 */
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
+
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 pub use ttf_parser::Width as Stretch;
 
@@ -96,9 +105,11 @@ enum LoadError {
     /// A valid TrueType font without a valid *Family Name*.
     UnnamedFont,
     /// A file IO related error.
+    #[cfg(feature = "std")]
     IoError(std::io::Error),
 }
 
+#[cfg(feature = "std")]
 impl From<std::io::Error> for LoadError {
     #[inline]
     fn from(e: std::io::Error) -> Self {
@@ -106,11 +117,12 @@ impl From<std::io::Error> for LoadError {
     }
 }
 
-impl std::fmt::Display for LoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for LoadError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             LoadError::MalformedFont => write!(f, "malformed font"),
             LoadError::UnnamedFont => write!(f, "font doesn't have a family name"),
+            #[cfg(feature = "std")]
             LoadError::IoError(ref e) => write!(f, "{}", e),
         }
     }
@@ -158,7 +170,7 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        self.load_font_source(Source::Binary(std::sync::Arc::new(data)))
+        self.load_font_source(Source::Binary(alloc::sync::Arc::new(data)))
     }
 
     /// Loads a font from the given source into the `Database`.
@@ -648,7 +660,7 @@ pub struct FaceInfo {
 #[derive(Clone)]
 pub enum Source {
     /// A font's raw data, typically backed by a Vec<u8>.
-    Binary(std::sync::Arc<dyn AsRef<[u8]> + Sync + Send>),
+    Binary(alloc::sync::Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's path.
     #[cfg(feature = "fs")]
@@ -662,8 +674,8 @@ pub enum Source {
     ),
 }
 
-impl std::fmt::Debug for Source {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Source {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Binary(arg0) => f
                 .debug_tuple("SharedBinary")
@@ -850,7 +862,12 @@ fn parse_name_record(name_table: &ttf_parser::name::Table, name_id: u16) -> Opti
         .find(|name| name.name_id == name_id && name.is_supported_encoding())?;
 
     if name_record.is_unicode() {
-        name_record.to_string()
+        let mut raw_data: Vec<u16> = Vec::new();
+        for c in ttf_parser::LazyArray16::<u16>::new(name_record.name) {
+            raw_data.push(c);
+        }
+
+        String::from_utf16(&raw_data).ok()
     } else if name_record.is_mac_roman() {
         // We support only MacRoman encoding here, which should be enough in most cases.
         let mut raw_data = Vec::with_capacity(name_record.name.len());
