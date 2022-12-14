@@ -340,40 +340,68 @@ impl Database {
         {
             #[cfg(feature = "fontconfig")]
             {
-                let mut fontconfig = fontconfig_parser::FontConfig::default();
-                match fontconfig.merge_config("/etc/fonts/fonts.conf") {
-                    Ok(_) => {
-                        for dir in fontconfig.dirs {
-                            let path = if dir.path.starts_with("~") {
-                                if let Ok(ref home) = std::env::var("HOME") {
-                                    let home_path = std::path::Path::new(home);
-                                    home_path.join(dir.path.strip_prefix("~").unwrap())
-                                } else {
-                                    continue;
-                                }
-                            } else {
-                                dir.path
-                            };
-                            self.load_fonts_dir(path);
-                        }
+                use std::env;
+                use std::fs;
+                use std::path::Path;
+                use std::path::PathBuf;
 
-                        // Yes, stop here. No need to load fonts from hardcoded paths.
-                        return;
+                let mut fontconfig = fontconfig_parser::FontConfig::default();
+
+                let mut config_files = vec![];
+                if let Ok(ref config_file) = env::var("FONTCONFIG_FILE") {
+                    config_files.push(PathBuf::from(config_file));
+                } else {
+                    if let Ok(ref xdg_config_home) = env::var("XDG_CONFIG_HOME") {
+                        let xdg_config_home = Path::new(xdg_config_home);
+                        config_files.push(xdg_config_home.join("fontconfig/fonts.conf"));
+                    } else {
+                        config_files.push(PathBuf::from("/etc/fonts/local.conf"));
                     }
-                    Err(err) => {
-                        // Fontconfig parsing failed? Try to load fonts from hardcoded paths then.
-                        log::warn!("Failed to parse fontconfig because: {}", err);
+                    config_files.push(PathBuf::from("/etc/fonts/fonts.conf"));
+                }
+
+                for path in config_files.iter() {
+                    if path.is_file() {
+                        fontconfig.merge_config(&path).ok();
+                        continue;
                     }
+                    if let Ok(dir) = fs::read_dir(path) {
+                        for entry in dir {
+                            if let Ok(entry) = entry {
+                                let path = entry.path();
+                                if path.is_file() {
+                                    fontconfig.merge_config(&path).ok();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for dir in fontconfig.dirs {
+                    let path = if dir.path.starts_with("~") {
+                        if let Ok(ref home) = env::var("HOME") {
+                            let home_path = Path::new(home);
+                            home_path.join(dir.path.strip_prefix("~").unwrap())
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        dir.path
+                    };
+                    self.load_fonts_dir(path);
                 }
             }
 
-            self.load_fonts_dir("/usr/share/fonts/");
-            self.load_fonts_dir("/usr/local/share/fonts/");
+            #[cfg(not(feature = "fontconfig"))]
+            {
+                self.load_fonts_dir("/usr/share/fonts/");
+                self.load_fonts_dir("/usr/local/share/fonts/");
 
-            if let Ok(ref home) = std::env::var("HOME") {
-                let home_path = std::path::Path::new(home);
-                self.load_fonts_dir(home_path.join(".fonts"));
-                self.load_fonts_dir(home_path.join(".local/share/fonts"));
+                if let Ok(ref home) = std::env::var("HOME") {
+                    let home_path = std::path::Path::new(home);
+                    self.load_fonts_dir(home_path.join(".fonts"));
+                    self.load_fonts_dir(home_path.join(".local/share/fonts"));
+                }
             }
         }
     }
