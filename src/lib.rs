@@ -341,7 +341,6 @@ impl Database {
             #[cfg(feature = "fontconfig")]
             {
                 use std::env;
-                use std::fs;
                 use std::path::Path;
                 use std::path::PathBuf;
 
@@ -361,18 +360,26 @@ impl Database {
                 }
 
                 for path in config_files.iter() {
-                    if path.is_file() {
-                        fontconfig.merge_config(&path).ok();
-                        continue;
-                    }
-                    if let Ok(dir) = fs::read_dir(path) {
-                        for entry in dir {
-                            if let Ok(entry) = entry {
-                                let path = entry.path();
-                                if path.is_file() {
-                                    fontconfig.merge_config(&path).ok();
-                                }
-                            }
+                    fontconfig.merge_config(&path).ok();
+                }
+
+                for fontconfig_parser::Alias {
+                    alias,
+                    default,
+                    prefer,
+                    accept,
+                } in fontconfig.aliases
+                {
+                    let names = [&prefer[..], &default[..], &accept[..]].concat();
+                    if let Some(name) = names.get(0) {
+                        match alias.clone().to_lowercase().as_str() {
+                            "serif" => self.set_serif_family(name),
+                            "sans-serif" => self.set_sans_serif_family(name),
+                            "sans serif" => self.set_sans_serif_family(name),
+                            "monospace" => self.set_monospace_family(name),
+                            "cursive" => self.set_cursive_family(name),
+                            "fantasy" => self.set_fantasy_family(name),
+                            _ => {}
                         }
                     }
                 }
