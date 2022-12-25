@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2022-12-25
+### Added
+- Support localized family names.
+- Improve fontconfig support. [@declantsien](https://github.com/declantsien)
+
+### Changed
+- `FaceInfo::family` was replaced with `FaceInfo::families` and contains a list of family
+  names now.
+
+### Fixed
+- Improve family name detection in variable fonts.
+
 ## [0.10.0] - 2022-11-08
 ### Added
 - `no_std` support. [@jackpot51](https://github.com/jackpot51)
@@ -106,7 +118,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/RazrFalcon/fontdb/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RazrFalcon/fontdb/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/RazrFalcon/fontdb/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/RazrFalcon/fontdb/compare/v0.9.1...v0.9.2
