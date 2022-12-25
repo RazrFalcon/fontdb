@@ -15,7 +15,7 @@ jobs:
           - stable
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Install toolchain
       uses: actions-rs/toolchain@v1
@@ -32,6 +32,9 @@ jobs:
 
     - name: Build with memmap
       run: cargo build --no-default-features --features memmap
+
+    - name: Build with fontconfig
+      run: cargo build --no-default-features --features fontconfig
 
     - name: Run tests
       run: cargo test

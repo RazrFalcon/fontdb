@@ -341,63 +341,7 @@ impl Database {
         {
             #[cfg(feature = "fontconfig")]
             {
-                use std::env;
-                use std::path::Path;
-                use std::path::PathBuf;
-
-                let mut fontconfig = fontconfig_parser::FontConfig::default();
-
-                let mut config_files = vec![];
-                if let Ok(ref config_file) = env::var("FONTCONFIG_FILE") {
-                    config_files.push(PathBuf::from(config_file));
-                } else {
-                    if let Ok(ref xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-                        let xdg_config_home = Path::new(xdg_config_home);
-                        config_files.push(xdg_config_home.join("fontconfig/fonts.conf"));
-                    } else {
-                        config_files.push(PathBuf::from("/etc/fonts/local.conf"));
-                    }
-                    config_files.push(PathBuf::from("/etc/fonts/fonts.conf"));
-                }
-
-                for path in config_files.iter() {
-                    fontconfig.merge_config(&path).ok();
-                }
-
-                for fontconfig_parser::Alias {
-                    alias,
-                    default,
-                    prefer,
-                    accept,
-                } in fontconfig.aliases
-                {
-                    let names = [&prefer[..], &default[..], &accept[..]].concat();
-                    if let Some(name) = names.get(0) {
-                        match alias.clone().to_lowercase().as_str() {
-                            "serif" => self.set_serif_family(name),
-                            "sans-serif" => self.set_sans_serif_family(name),
-                            "sans serif" => self.set_sans_serif_family(name),
-                            "monospace" => self.set_monospace_family(name),
-                            "cursive" => self.set_cursive_family(name),
-                            "fantasy" => self.set_fantasy_family(name),
-                            _ => {}
-                        }
-                    }
-                }
-
-                for dir in fontconfig.dirs {
-                    let path = if dir.path.starts_with("~") {
-                        if let Ok(ref home) = env::var("HOME") {
-                            let home_path = Path::new(home);
-                            home_path.join(dir.path.strip_prefix("~").unwrap())
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        dir.path
-                    };
-                    self.load_fonts_dir(path);
-                }
+                self.load_fontconfig();
             }
 
             #[cfg(not(feature = "fontconfig"))]
@@ -411,6 +355,67 @@ impl Database {
                     self.load_fonts_dir(home_path.join(".local/share/fonts"));
                 }
             }
+        }
+    }
+
+    #[cfg(all(
+        unix,
+        feature = "fontconfig",
+        not(any(target_os = "macos", target_os = "android"))
+    ))]
+    fn load_fontconfig(&mut self) {
+        use std::path::Path;
+
+        let mut fontconfig = fontconfig_parser::FontConfig::default();
+
+        if let Ok(ref config_file) = std::env::var("FONTCONFIG_FILE") {
+            let _ = fontconfig.merge_config(Path::new(config_file));
+        } else {
+            if let Ok(ref xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+                let xdg_config_home = Path::new(xdg_config_home);
+                let _ = fontconfig.merge_config(&xdg_config_home.join("fontconfig/fonts.conf"));
+            } else {
+                let _ = fontconfig.merge_config(Path::new("/etc/fonts/local.conf"));
+            }
+            let _ = fontconfig.merge_config(Path::new("/etc/fonts/fonts.conf"));
+        }
+
+        for fontconfig_parser::Alias {
+            alias,
+            default,
+            prefer,
+            accept,
+        } in fontconfig.aliases
+        {
+            let name = prefer
+                .get(0)
+                .or_else(|| default.get(0))
+                .or_else(|| accept.get(0));
+
+            if let Some(name) = name {
+                match alias.to_lowercase().as_str() {
+                    "serif" => self.set_serif_family(name),
+                    "sans-serif" => self.set_sans_serif_family(name),
+                    "sans serif" => self.set_sans_serif_family(name),
+                    "monospace" => self.set_monospace_family(name),
+                    "cursive" => self.set_cursive_family(name),
+                    "fantasy" => self.set_fantasy_family(name),
+                    _ => {}
+                }
+            }
+        }
+
+        for dir in fontconfig.dirs {
+            let path = if dir.path.starts_with("~") {
+                if let Ok(ref home) = std::env::var("HOME") {
+                    Path::new(home).join(dir.path.strip_prefix("~").unwrap())
+                } else {
+                    continue;
+                }
+            } else {
+                dir.path
+            };
+            self.load_fonts_dir(path);
         }
     }
 
