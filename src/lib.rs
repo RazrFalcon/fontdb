@@ -901,17 +901,28 @@ fn parse_face_info(
 }
 
 fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)>, String)> {
+    const FVAR_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"fvar");
     const NAME_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"name");
     let name_data = raw_face.table(NAME_TAG)?;
     let name_table = ttf_parser::name::Table::parse(name_data)?;
 
-    let mut families = Vec::new();
-    for name in name_table.names {
-        if name.name_id == ttf_parser::name_id::FAMILY && name.is_supported_encoding() {
-            if let Some(family) = name_to_unicode(&name) {
-                families.push((family, name.language()));
-            }
-        }
+    let is_variable = raw_face.table(FVAR_TAG).is_some();
+
+    // A variable font usually adds the default variation suffix to the Family Name,
+    // like _Name Light_ instead of just _Name_.
+    // The actual family name is stored under Typographic Family Name.
+    let family_name_id = if is_variable {
+        ttf_parser::name_id::TYPOGRAPHIC_FAMILY
+    } else {
+        ttf_parser::name_id::FAMILY
+    };
+
+    let mut families = collect_families(family_name_id, &name_table.names);
+
+    // Not all variable fonts follow the rules, therefore we have to fallback to Family Name
+    // when no Typographic Family Name was set.
+    if families.is_empty() && is_variable {
+        families = collect_families(ttf_parser::name_id::FAMILY, &name_table.names);
     }
 
     // Make English US the first one.
@@ -919,6 +930,7 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
         if let Some(index) = families
             .iter()
             .position(|f| f.1 == Language::English_UnitedStates)
+            .filter(|index| *index > 0)
         {
             let v = families.remove(index);
             families.insert(0, v)
@@ -938,6 +950,19 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
         .and_then(|name| name_to_unicode(&name))?;
 
     Some((families, post_script_name))
+}
+
+fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(String, Language)> {
+    let mut families = Vec::new();
+    for name in names.into_iter() {
+        if name.name_id == name_id && name.is_supported_encoding() {
+            if let Some(family) = name_to_unicode(&name) {
+                families.push((family, name.language()));
+            }
+        }
+    }
+
+    families
 }
 
 fn name_to_unicode(name: &ttf_parser::name::Name) -> Option<String> {
