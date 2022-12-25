@@ -69,6 +69,7 @@ use alloc::{
     vec::Vec,
 };
 
+pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
 /// A unique per database face ID.
@@ -504,7 +505,12 @@ impl Database {
             let candidates: Vec<_> = self
                 .faces
                 .iter()
-                .filter(|face| &face.family == name)
+                .filter(|face| {
+                    face.families
+                        .iter()
+                        .find(|family| family.0 == name)
+                        .is_some()
+                })
                 .collect();
 
             if !candidates.is_empty() {
@@ -660,12 +666,19 @@ pub struct FaceInfo {
     /// A face index in the `source`.
     pub index: u32,
 
-    /// A family name.
+    /// A list of family names.
+    ///
+    /// Contains pairs of Name + Language. Where the first family is always English US,
+    /// unless it's missing from the font.
     ///
     /// Corresponds to a *Font Family* (1) [name ID] in a TrueType font.
     ///
+    /// This is not an *Extended Typographic Family*. Meaning it will contain _Arial_ and not
+    /// _Arial Bold_. Before using `fontdb`, a family name should be stripped from any
+    /// style suffixes like _Bold_, _Italic_, _Light_, etc.
+    ///
     /// [name ID]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
-    pub family: String,
+    pub families: Vec<(String, Language)>,
 
     /// A PostScript name.
     ///
@@ -785,6 +798,12 @@ pub struct Query<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Family<'a> {
     /// The name of a font family of choice.
+    ///
+    /// This must be a _Family Name_ (ID 1) in terms of TrueType.
+    /// Meaning you have to pass a family without any additional suffixes like _Bold_, _Italic_,
+    /// _Regular_, etc.
+    ///
+    /// Localized names are allowed.
     Name(&'a str),
 
     /// Serif fonts represent the formal text style for a script.
@@ -864,7 +883,7 @@ fn parse_face_info(
     index: u32,
 ) -> Result<FaceInfo, LoadError> {
     let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
-    let (family, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
+    let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
     let (style, weight, stretch) = parse_os2(&raw_face);
     let monospaced = parse_post(&raw_face);
 
@@ -872,7 +891,7 @@ fn parse_face_info(
         id: ID(id),
         source,
         index,
-        family,
+        families,
         post_script_name,
         style,
         weight,
@@ -881,32 +900,58 @@ fn parse_face_info(
     })
 }
 
-fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(String, String)> {
+fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)>, String)> {
     const NAME_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"name");
     let name_data = raw_face.table(NAME_TAG)?;
     let name_table = ttf_parser::name::Table::parse(name_data)?;
-    let family_name = parse_name_record(&name_table, ttf_parser::name_id::FAMILY)?;
-    let pst_script_name = parse_name_record(&name_table, ttf_parser::name_id::POST_SCRIPT_NAME)?;
-    Some((family_name, pst_script_name))
-}
 
-fn parse_name_record(name_table: &ttf_parser::name::Table, name_id: u16) -> Option<String> {
-    let name_record = name_table
+    let mut families = Vec::new();
+    for name in name_table.names {
+        if name.name_id == ttf_parser::name_id::FAMILY && name.is_supported_encoding() {
+            if let Some(family) = name_to_unicode(&name) {
+                families.push((family, name.language()));
+            }
+        }
+    }
+
+    // Make English US the first one.
+    if families.len() > 1 {
+        if let Some(index) = families
+            .iter()
+            .position(|f| f.1 == Language::English_UnitedStates)
+        {
+            let v = families.remove(index);
+            families.insert(0, v)
+        }
+    }
+
+    if families.is_empty() {
+        return None;
+    }
+
+    let post_script_name = name_table
         .names
         .into_iter()
-        .find(|name| name.name_id == name_id && name.is_supported_encoding())?;
+        .find(|name| {
+            name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_supported_encoding()
+        })
+        .and_then(|name| name_to_unicode(&name))?;
 
-    if name_record.is_unicode() {
+    Some((families, post_script_name))
+}
+
+fn name_to_unicode(name: &ttf_parser::name::Name) -> Option<String> {
+    if name.is_unicode() {
         let mut raw_data: Vec<u16> = Vec::new();
-        for c in ttf_parser::LazyArray16::<u16>::new(name_record.name) {
+        for c in ttf_parser::LazyArray16::<u16>::new(name.name) {
             raw_data.push(c);
         }
 
         String::from_utf16(&raw_data).ok()
-    } else if name_record.is_mac_roman() {
+    } else if name.is_mac_roman() {
         // We support only MacRoman encoding here, which should be enough in most cases.
-        let mut raw_data = Vec::with_capacity(name_record.name.len());
-        for b in name_record.name {
+        let mut raw_data = Vec::with_capacity(name.name.len());
+        for b in name.name {
             raw_data.push(MAC_ROMAN[*b as usize]);
         }
 

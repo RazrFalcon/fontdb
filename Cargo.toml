@@ -16,7 +16,7 @@ log = "0.4"
 memmap2 = { version = "0.5", optional = true }
 
 [dependencies.ttf-parser]
-version = "0.17"
+version = "0.18"
 default-features = false
 features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 
