@@ -912,8 +912,7 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
 
     let mut families = collect_families(ttf_parser::name_id::TYPOGRAPHIC_FAMILY, &name_table.names);
 
-    // We have to fallback to Family Name when no Typographic Family Name was
-    // set.
+    // We have to fallback to Family Name when no Typographic Family Name was set.
     if families.is_empty() {
         families = collect_families(ttf_parser::name_id::FAMILY, &name_table.names);
     }
@@ -948,9 +947,24 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
 fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(String, Language)> {
     let mut families = Vec::new();
     for name in names.into_iter() {
-        if name.name_id == name_id && name.is_supported_encoding() {
+        if name.name_id == name_id && name.is_unicode() {
             if let Some(family) = name_to_unicode(&name) {
                 families.push((family, name.language()));
+            }
+        }
+    }
+
+    // If no Unicode English US family name was found then look for English MacRoman as well.
+    if !families
+        .iter()
+        .any(|f| f.1 == Language::English_UnitedStates)
+    {
+        for name in names.into_iter() {
+            if name.name_id == name_id && name.is_mac_roman() {
+                if let Some(family) = name_to_unicode(&name) {
+                    families.push((family, name.language()));
+                    break;
+                }
             }
         }
     }
