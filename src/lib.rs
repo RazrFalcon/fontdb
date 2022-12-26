@@ -676,11 +676,11 @@ pub struct FaceInfo {
     /// Contains pairs of Name + Language. Where the first family is always English US,
     /// unless it's missing from the font.
     ///
-    /// Corresponds to a *Font Family* (1) [name ID] in a TrueType font.
+    /// Corresponds to a *Typographic Family* (ID 16) or a *Font Family* (ID 1) [name ID]
+    /// in a TrueType font.
     ///
-    /// This is not an *Extended Typographic Family*. Meaning it will contain _Arial_ and not
-    /// _Arial Bold_. Before using `fontdb`, a family name should be stripped from any
-    /// style suffixes like _Bold_, _Italic_, _Light_, etc.
+    /// This is not an *Extended Typographic Family* or a *Full Name*.
+    /// Meaning it will contain _Arial_ and not _Arial Bold_.
     ///
     /// [name ID]: https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
     pub families: Vec<(String, Language)>,
@@ -804,7 +804,7 @@ pub struct Query<'a> {
 pub enum Family<'a> {
     /// The name of a font family of choice.
     ///
-    /// This must be a _Family Name_ (ID 1) in terms of TrueType.
+    /// This must be a *Typographic Family* (ID 16) or a *Family Name* (ID 1) in terms of TrueType.
     /// Meaning you have to pass a family without any additional suffixes like _Bold_, _Italic_,
     /// _Regular_, etc.
     ///
