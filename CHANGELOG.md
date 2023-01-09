@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.2] - 2023-01-10
+### Added
+- Implement `Display` trait for `ID`. [@7sDream](https://github.com/7sDream)
+
 ## [0.11.1] - 2022-12-26
 ### Fixed
 - Always prefer _Typographic Family_ to _Family Name_ when available.
@@ -124,7 +128,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/RazrFalcon/fontdb/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/RazrFalcon/fontdb/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/RazrFalcon/fontdb/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RazrFalcon/fontdb/compare/v0.9.3...v0.10.0
