@@ -82,6 +82,11 @@ pub use ttf_parser::Width as Stretch;
 ///
 /// ID overflow will cause a panic, but it's highly unlikely that someone would
 /// load more than 4 billion font faces.
+///
+/// Because the internal representation of ID is private, The `Display` trait
+/// implementation for this type only promise that unequal IDs will be displayed
+/// as different strings, but does not make any guarantees about format or
+/// content of the strings.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
 pub struct ID(u32);
 
@@ -92,6 +97,12 @@ impl ID {
     #[inline]
     pub fn dummy() -> Self {
         Self(0)
+    }
+}
+
+impl core::fmt::Display for ID {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
     }
 }
 
