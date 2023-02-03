@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- Tests for Database::query. [@lhinderberger](https://github.com/lhinderberger)
 
 ## [0.11.2] - 2023-01-10
 ### Added
