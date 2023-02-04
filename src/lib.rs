@@ -1140,13 +1140,18 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     // The spec doesn't say what to do if the weight is between 400 and 500 exclusive, so we
     // just use 450 as the cutoff.
     let weight = query.weight.0;
-    let matches = weight >= 400
+
+    let matching_weight = if matching_set
+        .iter()
+        .any(|&index| candidates[index].weight.0 == weight)
+    {
+        Weight(weight)
+    } else if weight >= 400
         && weight < 450
         && matching_set
             .iter()
-            .any(|&index| candidates[index].weight.0 == 500);
-
-    let matching_weight = if matches {
+            .any(|&index| candidates[index].weight.0 == 500)
+    {
         // Check 500 first.
         Weight::MEDIUM
     } else if weight >= 450
