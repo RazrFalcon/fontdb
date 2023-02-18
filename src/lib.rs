@@ -88,7 +88,7 @@ pub use ttf_parser::Width as Stretch;
 /// as different strings, but does not make any guarantees about format or
 /// content of the strings.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
-pub struct ID(u32);
+pub struct ID(usize);
 
 impl ID {
     /// Creates a dummy ID.
@@ -96,7 +96,7 @@ impl ID {
     /// Should be used in tandem with [`Database::push_face_info`].
     #[inline]
     pub fn dummy() -> Self {
-        Self(0)
+        Self(core::usize::MAX)
     }
 }
 
@@ -143,7 +143,6 @@ impl core::fmt::Display for LoadError {
 /// A font database.
 #[derive(Clone, Debug)]
 pub struct Database {
-    next_id: u32,
     faces: Vec<FaceInfo>,
     family_serif: String,
     family_sans_serif: String,
@@ -165,7 +164,6 @@ impl Database {
     #[inline]
     pub fn new() -> Self {
         Database {
-            next_id: 1,
             faces: Vec::new(),
             family_serif: "Times New Roman".to_string(),
             family_sans_serif: "Arial".to_string(),
@@ -192,8 +190,7 @@ impl Database {
         source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
             for index in 0..n {
-                self.next_id = self.next_id.checked_add(1).unwrap();
-                match parse_face_info(self.next_id, source.clone(), &data, index) {
+                match parse_face_info(self.faces.len(), source.clone(), &data, index) {
                     Ok(info) => self.faces.push(info),
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
@@ -212,8 +209,7 @@ impl Database {
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
-            self.next_id = self.next_id.checked_add(1).unwrap();
-            match parse_face_info(self.next_id, source.clone(), data, index) {
+            match parse_face_info(self.faces.len(), source.clone(), data, index) {
                 Ok(info) => self.faces.push(info),
                 Err(e) => {
                     log::warn!(
@@ -437,8 +433,7 @@ impl Database {
     ///
     /// The `id` field should be set to [`ID::dummy()`] and will be then overwritten by this method.
     pub fn push_face_info(&mut self, mut info: FaceInfo) {
-        self.next_id = self.next_id.checked_add(1).unwrap();
-        info.id = ID(self.next_id);
+        info.id = ID(self.faces.len());
         self.faces.push(info);
     }
 
@@ -450,12 +445,11 @@ impl Database {
     /// after loading a large directory with fonts.
     /// Or a specific face from a font.
     pub fn remove_face(&mut self, id: ID) -> bool {
-        match self.faces.iter().position(|item| item.id == id) {
-            Some(idx) => {
-                self.faces.remove(idx);
-                true
-            }
-            None => false,
+        if let Some(face) = self.faces.get_mut(id.0) {
+            face.disabled = true;
+            true
+        } else {
+            false
         }
     }
 
@@ -552,7 +546,7 @@ impl Database {
     /// Returns `None` if a face with such ID was already removed,
     /// or this ID belong to the other `Database`.
     pub fn face(&self, id: ID) -> Option<&FaceInfo> {
-        self.faces.iter().find(|item| item.id == id)
+        self.faces.get(id.0)
     }
 
     /// Returns font face storage and the face index by `ID`.
@@ -640,7 +634,7 @@ impl Database {
     /// from a file on disk, then that mapping is closed and the data becomes private to the process again.
     #[cfg(all(feature = "fs", feature = "memmap"))]
     pub fn make_face_data_unshared(&mut self, id: ID) {
-        let face_info = match self.faces.iter().find(|item| item.id == id) {
+        let face_info = match self.faces.get(id.0) {
             Some(face_info) => face_info,
             None => return,
         };
@@ -714,6 +708,9 @@ pub struct FaceInfo {
 
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
+
+    /// Whether or not this font face has been disabled.
+    pub disabled: bool,
 }
 
 /// A font source.
@@ -893,7 +890,7 @@ impl Default for Style {
 }
 
 fn parse_face_info(
-    id: u32,
+    id: usize,
     source: Source,
     data: &[u8],
     index: u32,
@@ -913,6 +910,7 @@ fn parse_face_info(
         weight,
         stretch,
         monospaced,
+        disabled: false,
     })
 }
 
