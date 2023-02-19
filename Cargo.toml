@@ -10,6 +10,7 @@ repository = "https://github.com/RazrFalcon/fontdb"
 license = "MIT"
 keywords = ["font", "db", "css", "truetype", "ttf"]
 categories = ["text-processing"]
+rust-version = "1.49"
 
 [dependencies]
 log = "0.4"
