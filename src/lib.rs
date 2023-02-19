@@ -141,7 +141,7 @@ impl core::fmt::Display for LoadError {
             LoadError::MalformedFont => write!(f, "malformed font"),
             LoadError::UnnamedFont => write!(f, "font doesn't have a family name"),
             #[cfg(feature = "std")]
-            LoadError::IoError(ref e) => write!(f, "{e}"),
+            LoadError::IoError(ref e) => write!(f, "{}", e),
         }
     }
 }
