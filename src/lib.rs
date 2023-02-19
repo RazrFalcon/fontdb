@@ -141,7 +141,7 @@ impl core::fmt::Display for LoadError {
             LoadError::MalformedFont => write!(f, "malformed font"),
             LoadError::UnnamedFont => write!(f, "font doesn't have a family name"),
             #[cfg(feature = "std")]
-            LoadError::IoError(ref e) => write!(f, "{}", e),
+            LoadError::IoError(ref e) => write!(f, "{e}"),
         }
     }
 }
@@ -200,9 +200,9 @@ impl Database {
     /// Will load all font faces in case of a font collection.
     pub fn load_font_source(&mut self, source: Source) {
         source.with_data(|data| {
-            let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+            let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
             for index in 0..n {
-                match parse_face_info(source.clone(), &data, index) {
+                match parse_face_info(source.clone(), data, index) {
                     Ok(info) => self.push_face_info(info),
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
@@ -298,8 +298,7 @@ impl Database {
             Err(_) => return,
         };
 
-        for entry in fonts_dir {
-            if let Ok(entry) = entry {
+        for entry in fonts_dir.flatten() {
                 let path = entry.path();
                 if path.is_file() {
                     match path.extension().and_then(|e| e.to_str()) {
@@ -315,7 +314,6 @@ impl Database {
                     // TODO: ignore symlinks?
                     self.load_fonts_dir(path);
                 }
-            }
         }
     }
 
@@ -524,12 +522,8 @@ impl Database {
             let candidates: Vec<_> = self
                 .faces
                 .iter()
-                .filter_map(|(_, face)| {
-                    face.families
-                        .iter()
-                        .find(|family| family.0 == name)
-                        .map(|_| face)
-                })
+                .filter(|(_, face)| face.families.iter().any(|family| family.0 == name))
+                .map(|(_, info)| info)
                 .collect();
 
             if !candidates.is_empty() {
@@ -652,7 +646,7 @@ impl Database {
 
         let shared_path = match old_source {
             #[cfg(all(feature = "fs", feature = "memmap"))]
-            Source::SharedFile(path, _) => path.clone(),
+            Source::SharedFile(path, _) => path,
             _ => return,
         };
 
@@ -1122,14 +1116,11 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
         Style::Oblique => [Style::Oblique, Style::Italic, Style::Normal],
         Style::Normal => [Style::Normal, Style::Oblique, Style::Italic],
     };
-    let matching_style = *style_preference
-        .iter()
-        .filter(|&query_style| {
-            matching_set
-                .iter()
-                .any(|&index| candidates[index].style == *query_style)
-        })
-        .next()?;
+    let matching_style = *style_preference.iter().find(|&query_style| {
+        matching_set
+            .iter()
+            .any(|&index| candidates[index].style == *query_style)
+    })?;
 
     matching_set.retain(|&index| candidates[index].style == matching_style);
 
@@ -1144,16 +1135,14 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
         .any(|&index| candidates[index].weight.0 == weight)
     {
         Weight(weight)
-    } else if weight >= 400
-        && weight < 450
+    } else if (400..450).contains(&weight)
         && matching_set
             .iter()
             .any(|&index| candidates[index].weight.0 == 500)
     {
         // Check 500 first.
         Weight::MEDIUM
-    } else if weight >= 450
-        && weight <= 500
+    } else if (450..=500).contains(&weight)
         && matching_set
             .iter()
             .any(|&index| candidates[index].weight.0 == 400)
