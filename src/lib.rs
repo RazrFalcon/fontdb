@@ -152,6 +152,12 @@ pub struct Database {
     family_monospace: String,
 }
 
+impl Default for Database {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Database {
     /// Create a new, empty `Database`.
     ///
