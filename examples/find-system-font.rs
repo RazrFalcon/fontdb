@@ -38,7 +38,7 @@ fn main() {
             }
         }
         None => {
-            println!("Error: '{FAMILY_NAME}' not found.");
+            println!("Error: '{}' not found.", FAMILY_NAME);
         }
     }
 }

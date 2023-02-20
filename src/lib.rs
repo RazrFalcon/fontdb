@@ -299,21 +299,21 @@ impl Database {
         };
 
         for entry in fonts_dir.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    match path.extension().and_then(|e| e.to_str()) {
-                        Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
-                        Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
-                            if let Err(e) = self.load_font_file(&path) {
-                                log::warn!("Failed to load '{}' cause {}.", path.display(), e);
-                            }
+            let path = entry.path();
+            if path.is_file() {
+                match path.extension().and_then(|e| e.to_str()) {
+                    Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
+                    Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
+                        if let Err(e) = self.load_font_file(&path) {
+                            log::warn!("Failed to load '{}' cause {}.", path.display(), e);
                         }
-                        _ => {}
                     }
-                } else if path.is_dir() {
-                    // TODO: ignore symlinks?
-                    self.load_fonts_dir(path);
+                    _ => {}
                 }
+            } else if path.is_dir() {
+                // TODO: ignore symlinks?
+                self.load_fonts_dir(path);
+            }
         }
     }
 
