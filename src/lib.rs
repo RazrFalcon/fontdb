@@ -72,12 +72,9 @@ use alloc::{
 pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
-use slotmap::DenseSlotMap;
+use slotmap::SlotMap;
 
 /// A unique per database face ID.
-///
-/// We're using [`KeyData`] internally, which is auto-incremented for each face.
-/// A face removal doesn't decrement the counter.
 ///
 /// Since `Database` is not global/unique, we cannot guarantee that a specific ID
 /// is actually from the same db instance. This is up to the caller.
@@ -152,7 +149,7 @@ impl core::fmt::Display for LoadError {
 /// A font database.
 #[derive(Clone, Debug)]
 pub struct Database {
-    faces: DenseSlotMap<InnerId, FaceInfo>,
+    faces: SlotMap<InnerId, FaceInfo>,
     family_serif: String,
     family_sans_serif: String,
     family_cursive: String,
@@ -173,7 +170,7 @@ impl Database {
     #[inline]
     pub fn new() -> Self {
         Database {
-            faces: DenseSlotMap::with_key(),
+            faces: SlotMap::with_key(),
             family_serif: "Times New Roman".to_string(),
             family_sans_serif: "Arial".to_string(),
             family_cursive: "Comic Sans MS".to_string(),
@@ -455,8 +452,8 @@ impl Database {
     /// Useful when you want to ignore some specific font face(s)
     /// after loading a large directory with fonts.
     /// Or a specific face from a font.
-    pub fn remove_face(&mut self, id: ID) -> bool {
-        self.faces.remove(id.0).is_some()
+    pub fn remove_face(&mut self, id: ID) {
+        self.faces.remove(id.0);
     }
 
     /// Returns `true` if the `Database` contains no font faces.
