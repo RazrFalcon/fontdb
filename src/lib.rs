@@ -72,10 +72,9 @@ use alloc::{
 pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
+use slotmap::SlotMap;
+
 /// A unique per database face ID.
-///
-/// We're using `u32` internally, which is auto-incremented for each face.
-/// A face removal doesn't decrement the counter.
 ///
 /// Since `Database` is not global/unique, we cannot guarantee that a specific ID
 /// is actually from the same db instance. This is up to the caller.
@@ -87,8 +86,15 @@ pub use ttf_parser::Width as Stretch;
 /// implementation for this type only promise that unequal IDs will be displayed
 /// as different strings, but does not make any guarantees about format or
 /// content of the strings.
+///
+/// [`KeyData`]: https://docs.rs/slotmap/latest/slotmap/struct.KeyData.html
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
-pub struct ID(u32);
+pub struct ID(InnerId);
+
+slotmap::new_key_type! {
+    /// Internal ID type.
+    struct InnerId;
+}
 
 impl ID {
     /// Creates a dummy ID.
@@ -96,13 +102,13 @@ impl ID {
     /// Should be used in tandem with [`Database::push_face_info`].
     #[inline]
     pub fn dummy() -> Self {
-        Self(0)
+        Self(InnerId::from(slotmap::KeyData::from_ffi(core::u64::MAX)))
     }
 }
 
 impl core::fmt::Display for ID {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", (self.0).0.as_ffi())
     }
 }
 
@@ -143,8 +149,7 @@ impl core::fmt::Display for LoadError {
 /// A font database.
 #[derive(Clone, Debug)]
 pub struct Database {
-    next_id: u32,
-    faces: Vec<FaceInfo>,
+    faces: SlotMap<InnerId, FaceInfo>,
     family_serif: String,
     family_sans_serif: String,
     family_cursive: String,
@@ -171,8 +176,7 @@ impl Database {
     #[inline]
     pub fn new() -> Self {
         Database {
-            next_id: 1,
-            faces: Vec::new(),
+            faces: SlotMap::with_key(),
             family_serif: "Times New Roman".to_string(),
             family_sans_serif: "Arial".to_string(),
             family_cursive: "Comic Sans MS".to_string(),
@@ -198,9 +202,8 @@ impl Database {
         source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
             for index in 0..n {
-                self.next_id = self.next_id.checked_add(1).unwrap();
-                match parse_face_info(self.next_id, source.clone(), &data, index) {
-                    Ok(info) => self.faces.push(info),
+                match parse_face_info(source.clone(), &data, index) {
+                    Ok(info) => self.push_face_info(info),
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
                         index,
@@ -218,9 +221,8 @@ impl Database {
 
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
-            self.next_id = self.next_id.checked_add(1).unwrap();
-            match parse_face_info(self.next_id, source.clone(), data, index) {
-                Ok(info) => self.faces.push(info),
+            match parse_face_info(source.clone(), data, index) {
+                Ok(info) => self.push_face_info(info),
                 Err(e) => {
                     log::warn!(
                         "Failed to load a font face {} from '{}' cause {}.",
@@ -443,9 +445,10 @@ impl Database {
     ///
     /// The `id` field should be set to [`ID::dummy()`] and will be then overwritten by this method.
     pub fn push_face_info(&mut self, mut info: FaceInfo) {
-        self.next_id = self.next_id.checked_add(1).unwrap();
-        info.id = ID(self.next_id);
-        self.faces.push(info);
+        self.faces.insert_with_key(|k| {
+            info.id = ID(k);
+            info
+        });
     }
 
     /// Removes a font face by `id` from the database.
@@ -455,14 +458,8 @@ impl Database {
     /// Useful when you want to ignore some specific font face(s)
     /// after loading a large directory with fonts.
     /// Or a specific face from a font.
-    pub fn remove_face(&mut self, id: ID) -> bool {
-        match self.faces.iter().position(|item| item.id == id) {
-            Some(idx) => {
-                self.faces.remove(idx);
-                true
-            }
-            None => false,
-        }
+    pub fn remove_face(&mut self, id: ID) {
+        self.faces.remove(id.0);
     }
 
     /// Returns `true` if the `Database` contains no font faces.
@@ -527,11 +524,11 @@ impl Database {
             let candidates: Vec<_> = self
                 .faces
                 .iter()
-                .filter(|face| {
+                .filter_map(|(_, face)| {
                     face.families
                         .iter()
                         .find(|family| family.0 == name)
-                        .is_some()
+                        .map(|_| face)
                 })
                 .collect();
 
@@ -545,12 +542,12 @@ impl Database {
         None
     }
 
-    /// Returns a reference to an internal storage.
+    /// Returns an iterator over the internal storage.
     ///
     /// This can be used for manual font matching.
     #[inline]
-    pub fn faces(&self) -> &[FaceInfo] {
-        &self.faces
+    pub fn faces(&self) -> impl Iterator<Item = &FaceInfo> + '_ {
+        self.faces.iter().map(|(_, info)| info)
     }
 
     /// Selects a `FaceInfo` by `id`.
@@ -558,7 +555,7 @@ impl Database {
     /// Returns `None` if a face with such ID was already removed,
     /// or this ID belong to the other `Database`.
     pub fn face(&self, id: ID) -> Option<&FaceInfo> {
-        self.faces.iter().find(|item| item.id == id)
+        self.faces.get(id.0)
     }
 
     /// Returns font face storage and the face index by `ID`.
@@ -610,7 +607,7 @@ impl Database {
         &mut self,
         id: ID,
     ) -> Option<(std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>, u32)> {
-        let face_info = self.faces.iter().find(|item| item.id == id)?;
+        let face_info = self.faces.get(id.0)?;
         let face_index = face_info.index;
 
         let old_source = face_info.source.clone();
@@ -632,7 +629,7 @@ impl Database {
 
         let shared_source = Source::SharedFile(path.clone(), shared_data.clone());
 
-        self.faces.iter_mut().for_each(|face| {
+        self.faces.iter_mut().for_each(|(_, face)| {
             if matches!(&face.source, Source::File(old_path) if old_path == &path) {
                 face.source = shared_source.clone();
             }
@@ -646,7 +643,7 @@ impl Database {
     /// from a file on disk, then that mapping is closed and the data becomes private to the process again.
     #[cfg(all(feature = "fs", feature = "memmap"))]
     pub fn make_face_data_unshared(&mut self, id: ID) {
-        let face_info = match self.faces.iter().find(|item| item.id == id) {
+        let face_info = match self.faces.get(id.0) {
             Some(face_info) => face_info,
             None => return,
         };
@@ -661,7 +658,7 @@ impl Database {
 
         let new_source = Source::File(shared_path.clone());
 
-        self.faces.iter_mut().for_each(|face| {
+        self.faces.iter_mut().for_each(|(_, face)| {
             if matches!(&face.source, Source::SharedFile(path, ..) if path == &shared_path) {
                 face.source = new_source.clone();
             }
@@ -898,19 +895,14 @@ impl Default for Style {
     }
 }
 
-fn parse_face_info(
-    id: u32,
-    source: Source,
-    data: &[u8],
-    index: u32,
-) -> Result<FaceInfo, LoadError> {
+fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, LoadError> {
     let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
     let (style, weight, stretch) = parse_os2(&raw_face);
     let monospaced = parse_post(&raw_face);
 
     Ok(FaceInfo {
-        id: ID(id),
+        id: ID::dummy(),
         source,
         index,
         families,
