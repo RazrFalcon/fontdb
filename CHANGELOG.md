@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2023-02-21
+### Added
+- `Database::default()`. [@7sDream](https://github.com/7sDream)
+
+### Changed
+- Database uses `slotmap::SlotMap` instead of `Vec` as an internal storage now.
+  This allows us to have O(1) indexing by `ID` by sacrificing faces iteration speed a bit.
+  [@7sDream](https://github.com/7sDream)
+- `Database::remove_face` no longer returns `bool`.
+- `Database::faces` returns an Iterator and not a slice now.
+- MSRV bumped to 1.49
+
 ## [0.12.0] - 2023-02-05
 ### Fixed
 - Face weight matching.
@@ -132,7 +144,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/RazrFalcon/fontdb/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/RazrFalcon/fontdb/compare/v0.11.2...v0.12.0
 [0.11.2]: https://github.com/RazrFalcon/fontdb/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/RazrFalcon/fontdb/compare/v0.11.0...v0.11.1
