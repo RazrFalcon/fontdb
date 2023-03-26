@@ -399,13 +399,12 @@ impl Database {
                 None
             };
 
-            let read_global = xdg_config_home
-                .map(|p| {
-                    fontconfig
-                        .merge_config(&p.join("fontconfig/fonts.conf"))
-                        .is_err()
-                })
-                .unwrap_or(true);
+            let read_global = match xdg_config_home {
+                Some(p) => fontconfig
+                    .merge_config(&p.join("fontconfig/fonts.conf"))
+                    .is_err(),
+                None => true,
+            };
 
             if read_global {
                 let _ = fontconfig.merge_config(Path::new("/etc/fonts/local.conf"));
