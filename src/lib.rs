@@ -403,7 +403,7 @@ impl Database {
                 .map(|p| {
                     fontconfig
                         .merge_config(&p.join("fontconfig/fonts.conf"))
-                        .is_ok()
+                        .is_err()
                 })
                 .unwrap_or(true);
 
