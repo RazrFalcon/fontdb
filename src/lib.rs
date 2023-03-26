@@ -384,14 +384,30 @@ impl Database {
         use std::path::Path;
 
         let mut fontconfig = fontconfig_parser::FontConfig::default();
+        let home = std::env::var("HOME");
 
         if let Ok(ref config_file) = std::env::var("FONTCONFIG_FILE") {
             let _ = fontconfig.merge_config(Path::new(config_file));
         } else {
-            if let Ok(ref xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-                let xdg_config_home = Path::new(xdg_config_home);
-                let _ = fontconfig.merge_config(&xdg_config_home.join("fontconfig/fonts.conf"));
+            let xdg_config_home = if let Ok(val) = std::env::var("XDG_CONFIG_HOME") {
+                Some(val.into())
+            } else if let Ok(ref home) = home {
+                // according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+                // $XDG_CONFIG_HOME should default to $HOME/.config if not set
+                Some(Path::new(home).join(".config"))
             } else {
+                None
+            };
+
+            let read_global = xdg_config_home
+                .map(|p| {
+                    fontconfig
+                        .merge_config(&p.join("fontconfig/fonts.conf"))
+                        .is_ok()
+                })
+                .unwrap_or(true);
+
+            if read_global {
                 let _ = fontconfig.merge_config(Path::new("/etc/fonts/local.conf"));
             }
             let _ = fontconfig.merge_config(Path::new("/etc/fonts/fonts.conf"));
@@ -424,7 +440,7 @@ impl Database {
 
         for dir in fontconfig.dirs {
             let path = if dir.path.starts_with("~") {
-                if let Ok(ref home) = std::env::var("HOME") {
+                if let Ok(ref home) = home {
                     Path::new(home).join(dir.path.strip_prefix("~").unwrap())
                 } else {
                     continue;
