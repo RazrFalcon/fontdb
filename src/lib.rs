@@ -368,6 +368,12 @@ impl Database {
             }
         }
 
+        // Redox OS.
+        #[cfg(target_os = "redox")]
+        {
+            self.load_fonts_dir("/ui/fonts");
+        }
+
         // Linux.
         #[cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))]
         {
