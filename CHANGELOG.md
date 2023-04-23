@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2023-04-23
+### Added
+- Load system fonts on RedoxOS. [@FloVanGH](https://github.com/FloVanGH)
+
+### Fixed
+- Improve missing `XDG_CONFIG_HOME` environment variable handling. Linux only.
+  [@7sDream](https://github.com/7sDream)
+- Improve downloadable fonts detection on macOS. [@messense](https://github.com/messense)
+
 ## [0.13.0] - 2023-02-21
 ### Added
 - `Database::default()`. [@7sDream](https://github.com/7sDream)
@@ -144,7 +153,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/RazrFalcon/fontdb/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/RazrFalcon/fontdb/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/RazrFalcon/fontdb/compare/v0.11.2...v0.12.0
 [0.11.2]: https://github.com/RazrFalcon/fontdb/compare/v0.11.1...v0.11.2
