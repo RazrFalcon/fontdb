@@ -16,6 +16,7 @@ rust-version = "1.49"
 log = "0.4"
 memmap2 = { version = "0.5", optional = true }
 slotmap = { version = "1.0.6", default-features = false }
+tinyvec = { version = "1.6.0", features = ["alloc"] }
 
 [dependencies.ttf-parser]
 version = "0.18"

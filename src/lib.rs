@@ -89,7 +89,7 @@ use slotmap::SlotMap;
 /// content of the strings.
 ///
 /// [`KeyData`]: https://docs.rs/slotmap/latest/slotmap/struct.KeyData.html
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Default)]
 pub struct ID(InnerId);
 
 slotmap::new_key_type! {
@@ -220,7 +220,9 @@ impl Database {
     pub fn load_font_source_ids(&mut self, source: Source) -> impl Iterator<Item = ID> {
         let ids = source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
-            let mut ids = Vec::with_capacity(n.try_into().expect("Too many fonts in collection"));
+            let mut ids = tinyvec::TinyVec::<[ID; 3]>::with_capacity(
+                n.try_into().expect("Too many fonts in collection"),
+            );
 
             for index in 0..n {
                 match parse_face_info(source.clone(), data, index) {
