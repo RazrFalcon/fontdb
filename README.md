@@ -36,19 +36,15 @@ A simple font (\*.ttf/\*.otf) usually contains a single font face,
 but a font collection (\*.ttc) can contain multiple font faces.
 
 `fontdb` stores and matches font faces, not fonts.
-Therefore, after loading a font collection with 5 faces (for example), the database will be populated
-with 5 `FaceInfo` objects, all of which will be pointing to the same file or binary data.
+Therefore, after loading a font collection with 5 faces (for example), the database will be
+populated with 5 `FaceInfo` objects, all of which will be pointing to the same file or binary data.
 
 ## Performance
 
 The database performance is largely limited by the storage itself.
 We are using [ttf-parser], so the parsing should not be a bottleneck.
 
-On my machine with Samsung SSD 860 and Gentoo Linux, it takes ~20ms
-to load 1906 font faces (most of them are from Google Noto collection)
-with a hot disk cache and ~860ms with a cold one.
-
-On Mac Mini M1 it takes just 9ms to load 898 fonts.
+For example, on Mac Book Pro 14 with M1 Pro, it takes just ~24ms to load 1361 font faces.
 
 ## Safety
 

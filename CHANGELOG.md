@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2023-05-09
+### Changed
+- `Database::load_font_source()` returns a list of loaded face IDs now.
+  [@notgull](https://github.com/notgull)
+- `ttf-parser` and `memmap2` dependencies update.
+
 ## [0.13.1] - 2023-04-23
 ### Added
 - Load system fonts on RedoxOS. [@FloVanGH](https://github.com/FloVanGH)
@@ -153,7 +159,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/RazrFalcon/fontdb/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/RazrFalcon/fontdb/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/RazrFalcon/fontdb/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/RazrFalcon/fontdb/compare/v0.11.2...v0.12.0

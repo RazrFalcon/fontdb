@@ -29,11 +29,10 @@ fn main() {
             let (src, index) = db.face_source(id).unwrap();
             if let fontdb::Source::File(ref path) = &src {
                 println!(
-                    "Font '{}':{} found in {}ms, fontdb id is '{}'.",
+                    "Font '{}':{} found in {}ms.",
                     path.display(),
                     index,
-                    now.elapsed().as_micros() as f64 / 1000.0,
-                    id,
+                    now.elapsed().as_micros() as f64 / 1000.0
                 );
             }
         }
