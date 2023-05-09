@@ -73,6 +73,7 @@ pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
 use slotmap::SlotMap;
+use tinyvec::TinyVec;
 
 /// A unique per database face ID.
 ///
@@ -88,7 +89,7 @@ use slotmap::SlotMap;
 /// content of the strings.
 ///
 /// [`KeyData`]: https://docs.rs/slotmap/latest/slotmap/struct.KeyData.html
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Default)]
 pub struct ID(InnerId);
 
 slotmap::new_key_type! {
@@ -192,18 +193,24 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        self.load_font_source(Source::Binary(alloc::sync::Arc::new(data)))
+        self.load_font_source(Source::Binary(alloc::sync::Arc::new(data)));
     }
 
-    /// Loads a font from the given source into the `Database`.
+    /// Loads a font from the given source into the `Database` and returns
+    /// the ID of the loaded font.
     ///
     /// Will load all font faces in case of a font collection.
-    pub fn load_font_source(&mut self, source: Source) {
-        source.with_data(|data| {
+    pub fn load_font_source(&mut self, source: Source) -> TinyVec<[ID; 8]> {
+        let ids = source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
+            let mut ids = TinyVec::with_capacity(n as usize);
+
             for index in 0..n {
                 match parse_face_info(source.clone(), data, index) {
-                    Ok(info) => self.push_face_info(info),
+                    Ok(info) => {
+                        ids.push(info.id);
+                        self.push_face_info(info);
+                    }
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
                         index,
@@ -211,7 +218,11 @@ impl Database {
                     ),
                 }
             }
+
+            ids
         });
+
+        ids.unwrap_or_default()
     }
 
     /// Backend function used by load_font_file to load font files.
