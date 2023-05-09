@@ -72,6 +72,7 @@ use alloc::{
 pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
+use core::convert::TryInto;
 use slotmap::SlotMap;
 
 /// A unique per database face ID.
@@ -212,6 +213,33 @@ impl Database {
                 }
             }
         });
+    }
+
+    /// Loads a font from the given source into the `Database` and returns
+    /// the ID of the loaded font.
+    pub fn load_font_source_ids(&mut self, source: Source) -> impl Iterator<Item = ID> {
+        let ids = source.with_data(|data| {
+            let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
+            let mut ids = Vec::with_capacity(n.try_into().expect("Too many fonts in collection"));
+
+            for index in 0..n {
+                match parse_face_info(source.clone(), data, index) {
+                    Ok(info) => {
+                        ids.push(info.id);
+                        self.push_face_info(info);
+                    }
+                    Err(e) => log::warn!(
+                        "Failed to load a font face {} from source cause {}.",
+                        index,
+                        e
+                    ),
+                }
+            }
+
+            ids
+        });
+
+        ids.unwrap_or_default().into_iter()
     }
 
     /// Backend function used by load_font_file to load font files.
