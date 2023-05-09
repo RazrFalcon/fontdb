@@ -72,8 +72,8 @@ use alloc::{
 pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
 
-use core::convert::TryInto;
 use slotmap::SlotMap;
+use tinyvec::TinyVec;
 
 /// A unique per database face ID.
 ///
@@ -193,36 +193,17 @@ impl Database {
     ///
     /// Will load all font faces in case of a font collection.
     pub fn load_font_data(&mut self, data: Vec<u8>) {
-        self.load_font_source(Source::Binary(alloc::sync::Arc::new(data)))
-    }
-
-    /// Loads a font from the given source into the `Database`.
-    ///
-    /// Will load all font faces in case of a font collection.
-    pub fn load_font_source(&mut self, source: Source) {
-        source.with_data(|data| {
-            let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
-            for index in 0..n {
-                match parse_face_info(source.clone(), data, index) {
-                    Ok(info) => self.push_face_info(info),
-                    Err(e) => log::warn!(
-                        "Failed to load a font face {} from source cause {}.",
-                        index,
-                        e
-                    ),
-                }
-            }
-        });
+        self.load_font_source(Source::Binary(alloc::sync::Arc::new(data)));
     }
 
     /// Loads a font from the given source into the `Database` and returns
     /// the ID of the loaded font.
-    pub fn load_font_source_ids(&mut self, source: Source) -> impl Iterator<Item = ID> {
+    ///
+    /// Will load all font faces in case of a font collection.
+    pub fn load_font_source(&mut self, source: Source) -> TinyVec<[ID; 8]> {
         let ids = source.with_data(|data| {
             let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
-            let mut ids = tinyvec::TinyVec::<[ID; 3]>::with_capacity(
-                n.try_into().expect("Too many fonts in collection"),
-            );
+            let mut ids = TinyVec::with_capacity(n as usize);
 
             for index in 0..n {
                 match parse_face_info(source.clone(), data, index) {
@@ -241,7 +222,7 @@ impl Database {
             ids
         });
 
-        ids.unwrap_or_default().into_iter()
+        ids.unwrap_or_default()
     }
 
     /// Backend function used by load_font_file to load font files.
