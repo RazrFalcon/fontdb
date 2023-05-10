@@ -207,9 +207,12 @@ impl Database {
 
             for index in 0..n {
                 match parse_face_info(source.clone(), data, index) {
-                    Ok(info) => {
-                        ids.push(info.id);
-                        self.push_face_info(info);
+                    Ok(mut info) => {
+                        let id = self.faces.insert_with_key(|k| {
+                            info.id = ID(k);
+                            info
+                        });
+                        ids.push(ID(id));
                     }
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
