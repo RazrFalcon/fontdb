@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.1] - 2023-05-10
+### Fixed
+- Return valid IDs from `Database::load_font_source()`.
+  [@notgull](https://github.com/notgull)
+
 ## [0.14.0] - 2023-05-09
 ### Changed
 - `Database::load_font_source()` returns a list of loaded face IDs now.
@@ -159,7 +164,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/RazrFalcon/fontdb/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/RazrFalcon/fontdb/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/RazrFalcon/fontdb/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/RazrFalcon/fontdb/compare/v0.12.0...v0.13.0
