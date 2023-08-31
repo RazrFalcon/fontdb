@@ -456,8 +456,8 @@ impl Database {
         {
             let name = prefer
                 .get(0)
-                .or_else(|| default.get(0))
-                .or_else(|| accept.get(0));
+                .or_else(|| accept.get(0))
+                .or_else(|| default.get(0));
 
             if let Some(name) = name {
                 match alias.to_lowercase().as_str() {
