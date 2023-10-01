@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.15.0] - 2023-10-01
 ### Changed
 - Enable the `fontconfig` feature by default. Linux-only.
+- MSRV bumped to 1.60 due to `log`.
 
 ### Fixed
 - Fix fontconfig alias matching order.
