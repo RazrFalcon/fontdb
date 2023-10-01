@@ -410,6 +410,7 @@ impl Database {
         }
     }
 
+    // Linux.
     #[cfg(all(
         unix,
         feature = "fontconfig",

@@ -30,8 +30,12 @@ fontconfig-parser = { version = "0.5", optional = true, default-features = false
 env_logger = { version = "0.9", default-features = false } # 0.10 requires Rust 1.60+
 
 [features]
-default = ["fs", "memmap", "std"]
-fontconfig = ["fontconfig-parser", "fs"]
-fs = ["std"] # allows local filesystem interactions
-memmap = ["fs", "memmap2"] # allows font files memory mapping, greatly improves performance
+default = ["std", "fs", "memmap", "fontconfig"]
 std = ["ttf-parser/std"]
+# Allows local filesystem interactions.
+fs = ["std"]
+# Allows font files memory mapping, greatly improves performance.
+memmap = ["fs", "memmap2"]
+# Enables minimal fontconfig support on Linux.
+# Must be enabled for NixOS, otherwise no fonts will be loaded.
+fontconfig = ["fontconfig-parser", "fs"]
