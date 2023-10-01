@@ -14,7 +14,7 @@ rust-version = "1.60"
 
 [dependencies]
 log = "0.4"
-memmap2 = { version = "0.6", optional = true }
+memmap2 = { version = "0.8", optional = true }
 slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
@@ -27,7 +27,7 @@ features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 fontconfig-parser = { version = "0.5", optional = true, default-features = false }
 
 [dev-dependencies]
-env_logger = { version = "0.9", default-features = false } # 0.10 requires Rust 1.60+
+env_logger = { version = "0.10", default-features = false }
 
 [features]
 default = ["std", "fs", "memmap", "fontconfig"]
