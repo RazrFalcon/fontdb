@@ -1,6 +1,6 @@
 [package]
 name = "fontdb"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["Yevhenii Reizner <razrfalcon@gmail.com>"]
 edition = "2018"
 description = "A simple, in-memory font database with CSS-like queries."
@@ -14,12 +14,12 @@ rust-version = "1.60"
 
 [dependencies]
 log = "0.4"
-memmap2 = { version = "0.8", optional = true }
+memmap2 = { version = "0.9", optional = true }
 slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
 [dependencies.ttf-parser]
-version = "0.19"
+version = "0.20"
 default-features = false
 features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 
