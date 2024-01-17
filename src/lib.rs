@@ -762,6 +762,12 @@ pub struct FaceInfo {
 
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
+
+    /// Monospace per em width. `None` if not monospaced.
+    pub monospace_em_width: Option<f32>,
+
+    /// Scripts supported by the font.
+    pub scripts: Vec<ttf_parser::Tag>,
 }
 
 /// A font source.
@@ -944,7 +950,11 @@ fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, 
     let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
     let (style, weight, stretch) = parse_os2(&raw_face);
+    let scripts = parse_scripts(&raw_face);
     let monospaced = parse_post(&raw_face);
+    let monospace_em_width = monospaced
+        .then(|| parse_monospace_em_width(&raw_face))
+        .flatten();
 
     Ok(FaceInfo {
         id: ID::dummy(),
@@ -956,6 +966,8 @@ fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, 
         weight,
         stretch,
         monospaced,
+        monospace_em_width,
+        scripts,
     })
 }
 
@@ -1067,6 +1079,49 @@ fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
     let stretch = table.width();
 
     (style, Weight(weight.to_number()), stretch)
+}
+
+fn parse_scripts(raw_face: &ttf_parser::RawFace) -> Vec<ttf_parser::Tag> {
+    const GPOS_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"gpos");
+    const GSUB_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"gsub");
+
+    raw_face.table(GPOS_TAG).into_iter()
+        .chain(raw_face.table(GSUB_TAG))
+        .filter_map(ttf_parser::opentype_layout::LayoutTable::parse)
+        .map(|layout_table| layout_table.scripts)
+        .flatten()
+        .map(|script| script.tag)
+        .collect()
+}
+
+fn parse_monospace_em_width(raw_face: &ttf_parser::RawFace) -> Option<f32> {
+    const HHEA_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"hhea");
+    const MAXP_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"maxp");
+    const HMTX_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"hmtx");
+    const HEAD_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"head");
+
+    let metrics = raw_face
+        .table(HHEA_TAG)
+        .and_then(ttf_parser::hhea::Table::parse)
+        .map(|hhea| hhea.number_of_metrics)?;
+
+    let glyphs = raw_face
+        .table(MAXP_TAG)
+        .and_then(ttf_parser::maxp::Table::parse)
+        .map(|maxp| maxp.number_of_glyphs)?;
+
+    let h_advance = raw_face
+        .table(HMTX_TAG)
+        .and_then(|data| ttf_parser::hmtx::Table::parse(metrics, glyphs, data))
+        .map(|hmtx| hmtx.metrics.last())?
+        .map(|h_metric| h_metric.advance)? as f32;
+
+    let units_per_em = raw_face
+        .table(HEAD_TAG)
+        .and_then(ttf_parser::head::Table::parse)
+        .map(|head| head.units_per_em)? as f32;
+
+    Some(h_advance / units_per_em)
 }
 
 fn parse_post(raw_face: &ttf_parser::RawFace) -> bool {
