@@ -20,8 +20,7 @@ slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
 [dependencies.ttf-parser]
-# version = "0.20"
-path = "../ttf-parser"
+version = "0.20"
 default-features = false
 features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 
