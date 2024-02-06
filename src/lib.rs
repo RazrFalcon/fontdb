@@ -68,6 +68,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 pub use ttf_parser::Language;
 pub use ttf_parser::Width as Stretch;
@@ -90,6 +92,7 @@ use tinyvec::TinyVec;
 ///
 /// [`KeyData`]: https://docs.rs/slotmap/latest/slotmap/struct.KeyData.html
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ID(InnerId);
 
 slotmap::new_key_type! {
@@ -114,6 +117,7 @@ impl core::fmt::Display for ID {
 }
 
 /// A list of possible font loading errors.
+/// https://github.com/RazrFalcon/fontdb
 #[derive(Debug)]
 enum LoadError {
     /// A malformed font.
@@ -149,6 +153,7 @@ impl core::fmt::Display for LoadError {
 
 /// A font database.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Database {
     faces: SlotMap<InnerId, FaceInfo>,
     family_serif: String,
@@ -717,6 +722,7 @@ impl Database {
 ///
 /// A single item of the `Database`.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct FaceInfo {
     /// An unique ID.
     pub id: ID,
@@ -784,6 +790,155 @@ pub enum Source {
         std::path::PathBuf,
         std::sync::Arc<dyn AsRef<[u8]> + Sync + Send>,
     ),
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Source {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStructVariant;
+        use std::ops::Deref;
+        match self {
+            Self::Binary(b) => {
+                let mut variant = serializer.serialize_struct_variant("Source", 0, "Binary", 1)?;
+                variant.serialize_field("data", b.deref().as_ref())?;
+                variant.end()
+            }
+            Self::File(file) => {
+                let mut variant = serializer.serialize_struct_variant("Source", 1, "File", 1)?;
+                variant.serialize_field("path", file)?;
+                variant.end()
+            }
+            Self::SharedFile(path, b) => {
+                let mut variant =
+                    serializer.serialize_struct_variant("Source", 2, "SharedFile", 2)?;
+                variant.serialize_field("path", path)?;
+                variant.serialize_field("data", b.deref().as_ref())?;
+                variant.end()
+            }
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Source {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde::de::VariantAccess;
+        use serde::de::Visitor;
+
+        #[derive(Deserialize, Clone, Copy)]
+        #[serde(field_identifier)]
+        enum Variant {
+            Binary = 0,
+            File = 1,
+            SharedFile = 2,
+        }
+
+        struct ArcBufVisitor;
+
+        impl<'de> Visitor<'de> for ArcBufVisitor {
+            type Value = alloc::sync::Arc<dyn AsRef<[u8]> + Sync + Send>;
+
+            fn expecting(&self, formatter: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
+                write!(formatter, "a raw byte buffer")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let bytes: Vec<u8> = seq.next_element()?.unwrap();
+
+                self.visit_byte_buf(bytes)
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_byte_buf(v.to_vec())
+            }
+
+            fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_byte_buf(v.to_vec())
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(alloc::sync::Arc::new(v))
+            }
+        }
+
+        struct SourceVisitor(Option<Variant>);
+
+        impl<'de> Visitor<'de> for SourceVisitor {
+            type Value = Source;
+
+            fn expecting(&self, formatter: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
+                formatter.write_str("enum Source")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                match self.0 {
+                    Some(Variant::Binary) => {
+                        let byte_buf = ArcBufVisitor.visit_seq(seq)?;
+                        Ok(Source::Binary(byte_buf))
+                    }
+                    Some(Variant::File) => {
+                        let path: std::path::PathBuf = seq
+                            .next_element()?
+                            .ok_or_else(|| A::Error::missing_field("path"))?;
+
+                        Ok(Source::File(path))
+                    }
+                    Some(Variant::SharedFile) => {
+                        let path: std::path::PathBuf = seq
+                            .next_element()?
+                            .ok_or_else(|| A::Error::missing_field("path"))?;
+                        let byte_buf = ArcBufVisitor.visit_seq(seq)?;
+
+                        Ok(Source::SharedFile(path, byte_buf))
+                    }
+                    None => Err(A::Error::missing_field("Variant")),
+                }
+            }
+
+            fn visit_enum<A>(mut self, data: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::EnumAccess<'de>,
+            {
+                let (variant, value) = data.variant::<Variant>()?;
+
+                self.0 = Some(variant);
+
+                match variant {
+                    Variant::Binary => value.tuple_variant(1, self),
+                    Variant::File => value.tuple_variant(1, self),
+                    Variant::SharedFile => value.tuple_variant(2, self),
+                }
+            }
+        }
+
+        deserializer.deserialize_enum(
+            "Source",
+            &["Binary", "File", "SharedFile"],
+            SourceVisitor(None),
+        )
+    }
 }
 
 impl core::fmt::Debug for Source {
@@ -860,6 +1015,7 @@ pub struct Query<'a> {
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Family<'a> {
     /// The name of a font family of choice.
     ///
@@ -892,6 +1048,7 @@ pub enum Family<'a> {
 
 /// Specifies the weight of glyphs in the font, their degree of blackness or stroke thickness.
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Weight(pub u16);
 
 impl Default for Weight {
@@ -924,6 +1081,7 @@ impl Weight {
 
 /// Allows italic or oblique faces to be selected.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Style {
     /// A face that is neither italic not obliqued.
     Normal,

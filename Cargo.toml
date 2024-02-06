@@ -15,11 +15,13 @@ rust-version = "1.60"
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.9", optional = true }
+serde = { version = "1.0.196", features = ["derive"], default-features = false, optional = true }
 slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
 [dependencies.ttf-parser]
-version = "0.20"
+# version = "0.20"
+path = "../ttf-parser"
 default-features = false
 features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 
@@ -39,3 +41,4 @@ memmap = ["fs", "memmap2"]
 # Enables minimal fontconfig support on Linux.
 # Must be enabled for NixOS, otherwise no fonts will be loaded.
 fontconfig = ["fontconfig-parser", "fs"]
+serde = ["dep:serde", "slotmap/serde", "ttf-parser/serde"]
