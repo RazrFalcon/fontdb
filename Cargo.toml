@@ -22,6 +22,7 @@ tinyvec = { version = "1.6.0", features = ["alloc"] }
 [dependencies.ttf-parser]
 version = "0.20"
 git = "https://github.com/StratusFearMe21/ttf-parser"
+branch = "serde"
 default-features = false
 features = ["opentype-layout", "apple-layout", "variable-fonts", "glyph-names"]
 
