@@ -117,7 +117,6 @@ impl core::fmt::Display for ID {
 }
 
 /// A list of possible font loading errors.
-/// https://github.com/RazrFalcon/fontdb
 #[derive(Debug)]
 enum LoadError {
     /// A malformed font.
