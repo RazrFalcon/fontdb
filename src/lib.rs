@@ -345,7 +345,10 @@ impl Database {
     pub fn load_system_fonts(&mut self) {
         #[cfg(target_os = "windows")]
         {
-            self.load_fonts_dir("C:\\Windows\\Fonts\\");
+            if let Some(ref system_root) = std::env::var_os("SYSTEMROOT") {
+                let system_root_path = std::path::Path::new(system_root);
+                self.load_fonts_dir(system_root_path.join("Fonts"));
+            }
 
             if let Ok(ref home) = std::env::var("USERPROFILE") {
                 let home_path = std::path::Path::new(home);
