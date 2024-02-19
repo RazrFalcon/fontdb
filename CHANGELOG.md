@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.2] - 2024-02-19
+### Fixed
+- System fonts loading on Windows when the system drive is not `C:\\`.
+  [@tronical](https://github.com/@tronical)
+
 ## [0.16.1] - 2024-02-09
 ### Fixed
 - Treat fonts with non-zero italic angle as italic.
@@ -181,7 +186,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.16.2...HEAD
+[0.16.2]: https://github.com/RazrFalcon/fontdb/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/RazrFalcon/fontdb/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/RazrFalcon/fontdb/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/RazrFalcon/fontdb/compare/v0.14.1...v0.15.0
