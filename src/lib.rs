@@ -314,7 +314,12 @@ impl Database {
 
         for entry in fonts_dir.flatten() {
             let path = entry.path();
-            if path.is_file() {
+            let file_type = match entry.file_type() {
+                Ok(t) => t,
+                Err(_) => return,
+            };
+
+            if file_type.is_file() {
                 match path.extension().and_then(|e| e.to_str()) {
                     Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
                     Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
@@ -324,7 +329,7 @@ impl Database {
                     }
                     _ => {}
                 }
-            } else if path.is_dir() {
+            } else if file_type.is_dir() {
                 // TODO: ignore symlinks?
                 self.load_fonts_dir(path);
             }
