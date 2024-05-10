@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2024-05-10
+### Added
+- Up to 10% faster `Database::load_system_fonts`.
+  [@qarmin](https://github.com/@qarmin) and [@y5](https://github.com/@y5)
+
+### Changed
+- Latest `ttf-parser`.
+
 ## [0.16.2] - 2024-02-19
 ### Fixed
 - System fonts loading on Windows when the system drive is not `C:\\`.
@@ -186,7 +194,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.16.2...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/RazrFalcon/fontdb/compare/v0.16.2...v0.17.0
 [0.16.2]: https://github.com/RazrFalcon/fontdb/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/RazrFalcon/fontdb/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/RazrFalcon/fontdb/compare/v0.15.0...v0.16.0
