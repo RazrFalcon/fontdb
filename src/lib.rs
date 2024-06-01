@@ -236,7 +236,9 @@ impl Database {
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
             match parse_face_info(source.clone(), data, index) {
-                Ok(info) => self.push_face_info(info),
+                Ok(info) => {
+                    self.push_face_info(info);
+                }
                 Err(e) => {
                     log::warn!(
                         "Failed to load a font face {} from '{}' cause {}.",
@@ -503,11 +505,11 @@ impl Database {
     /// This method doesn't parse the `source` font.
     ///
     /// The `id` field should be set to [`ID::dummy()`] and will be then overwritten by this method.
-    pub fn push_face_info(&mut self, mut info: FaceInfo) {
-        self.faces.insert_with_key(|k| {
+    pub fn push_face_info(&mut self, mut info: FaceInfo) -> ID {
+        ID(self.faces.insert_with_key(|k| {
             info.id = ID(k);
             info
-        });
+        }))
     }
 
     /// Removes a font face by `id` from the database.
