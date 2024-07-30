@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- Symlinked files and directories will now be included when loading
+  system fonts.
 
 ## [0.20.0] - 2024-07-02
 ### Changed
