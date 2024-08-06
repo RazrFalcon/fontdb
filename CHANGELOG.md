@@ -5,9 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
-### Changed
-- Symlinked files and directories will now be included when loading
-  system fonts.
+
+## [0.21.0] - 2024-08-06
+### Added
+- Symlinked files and directories will now be included when loading system fonts.
+  [@jcdickinson](https://github.com/@jcdickinson)
 
 ## [0.20.0] - 2024-07-02
 ### Changed
@@ -210,7 +212,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/RazrFalcon/fontdb/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/RazrFalcon/fontdb/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/RazrFalcon/fontdb/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/RazrFalcon/fontdb/compare/v0.17.0...v0.18.0
