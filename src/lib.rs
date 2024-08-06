@@ -302,38 +302,86 @@ impl Database {
     /// It will simply skip malformed fonts and will print a warning into the log for each of them.
     #[cfg(feature = "fs")]
     pub fn load_fonts_dir<P: AsRef<std::path::Path>>(&mut self, dir: P) {
-        self.load_fonts_dir_impl(dir.as_ref())
+        self.load_fonts_dir_impl(dir.as_ref(), &mut Default::default())
+    }
+
+    #[cfg(feature = "fs")]
+    fn canonicalize(
+        &self,
+        path: std::path::PathBuf,
+        entry: std::fs::DirEntry,
+        seen: &mut std::collections::HashSet<std::path::PathBuf>,
+    ) -> Option<(std::path::PathBuf, std::fs::FileType)> {
+        let file_type = entry.file_type().ok()?;
+        if !file_type.is_symlink() {
+            if !seen.is_empty() {
+                if seen.contains(&path) {
+                    return None;
+                }
+                seen.insert(path.clone());
+            }
+
+            return Some((path, file_type));
+        }
+
+        if seen.is_empty() && file_type.is_dir() {
+            seen.reserve(8192 / std::mem::size_of::<std::path::PathBuf>());
+
+            for (_, info) in self.faces.iter() {
+                let path = match &info.source {
+                    Source::Binary(_) => continue,
+                    Source::File(path) => path.to_path_buf(),
+                    #[cfg(feature = "memmap")]
+                    Source::SharedFile(path, _) => path.to_path_buf(),
+                };
+                seen.insert(path);
+            }
+        }
+
+        let stat = std::fs::metadata(&path).ok()?;
+        if stat.is_symlink() {
+            return None;
+        }
+
+        let canon = std::fs::canonicalize(path).ok()?;
+        if seen.contains(&canon) {
+            return None;
+        }
+        seen.insert(canon.clone());
+        Some((canon, stat.file_type()))
     }
 
     // A non-generic version.
-    #[rustfmt::skip] // keep extensions match as is
     #[cfg(feature = "fs")]
-    fn load_fonts_dir_impl(&mut self, dir: &std::path::Path) {
+    fn load_fonts_dir_impl(
+        &mut self,
+        dir: &std::path::Path,
+        seen: &mut std::collections::HashSet<std::path::PathBuf>,
+    ) {
         let fonts_dir = match std::fs::read_dir(dir) {
             Ok(dir) => dir,
             Err(_) => return,
         };
 
         for entry in fonts_dir.flatten() {
-            let path = entry.path();
-            let file_type = match entry.file_type() {
-                Ok(t) => t,
-                Err(_) => return,
+            let (path, file_type) = match self.canonicalize(entry.path(), entry, seen) {
+                Some(v) => v,
+                None => continue,
             };
 
             if file_type.is_file() {
                 match path.extension().and_then(|e| e.to_str()) {
+                    #[rustfmt::skip] // keep extensions match as is
                     Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
                     Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
                         if let Err(e) = self.load_font_file(&path) {
                             log::warn!("Failed to load '{}' cause {}.", path.display(), e);
                         }
-                    }
+                    },
                     _ => {}
                 }
             } else if file_type.is_dir() {
-                // TODO: ignore symlinks?
-                self.load_fonts_dir(path);
+                self.load_fonts_dir_impl(&path, seen);
             }
         }
     }
@@ -352,24 +400,32 @@ impl Database {
     pub fn load_system_fonts(&mut self) {
         #[cfg(target_os = "windows")]
         {
+            let mut seen = Default::default();
             if let Some(ref system_root) = std::env::var_os("SYSTEMROOT") {
                 let system_root_path = std::path::Path::new(system_root);
-                self.load_fonts_dir(system_root_path.join("Fonts"));
+                self.load_fonts_dir_impl(&system_root_path.join("Fonts"), &mut seen);
             } else {
-                self.load_fonts_dir("C:\\Windows\\Fonts\\");
+                self.load_fonts_dir_impl("C:\\Windows\\Fonts\\".as_ref(), &mut seen);
             }
 
             if let Ok(ref home) = std::env::var("USERPROFILE") {
                 let home_path = std::path::Path::new(home);
-                self.load_fonts_dir(home_path.join("AppData\\Local\\Microsoft\\Windows\\Fonts"));
-                self.load_fonts_dir(home_path.join("AppData\\Roaming\\Microsoft\\Windows\\Fonts"));
+                self.load_fonts_dir_impl(
+                    &home_path.join("AppData\\Local\\Microsoft\\Windows\\Fonts"),
+                    &mut seen,
+                );
+                self.load_fonts_dir_impl(
+                    &home_path.join("AppData\\Roaming\\Microsoft\\Windows\\Fonts"),
+                    &mut seen,
+                );
             }
         }
 
         #[cfg(target_os = "macos")]
         {
-            self.load_fonts_dir("/Library/Fonts");
-            self.load_fonts_dir("/System/Library/Fonts");
+            let mut seen = Default::default();
+            self.load_fonts_dir_impl("/Library/Fonts".as_ref(), &mut seen);
+            self.load_fonts_dir_impl("/System/Library/Fonts".as_ref(), &mut seen);
             // Downloadable fonts, location varies on major macOS releases
             if let Ok(dir) = std::fs::read_dir("/System/Library/AssetsV2") {
                 for entry in dir {
@@ -382,22 +438,23 @@ impl Database {
                         .to_string_lossy()
                         .starts_with("com_apple_MobileAsset_Font")
                     {
-                        self.load_fonts_dir(entry.path());
+                        self.load_fonts_dir_impl(&entry.path(), &mut seen);
                     }
                 }
             }
-            self.load_fonts_dir("/Network/Library/Fonts");
+            self.load_fonts_dir_impl("/Network/Library/Fonts".as_ref(), &mut seen);
 
             if let Ok(ref home) = std::env::var("HOME") {
                 let home_path = std::path::Path::new(home);
-                self.load_fonts_dir(home_path.join("Library/Fonts"));
+                self.load_fonts_dir_impl(&home_path.join("Library/Fonts"), &mut seen);
             }
         }
 
         // Redox OS.
         #[cfg(target_os = "redox")]
         {
-            self.load_fonts_dir("/ui/fonts");
+            let mut seen = Default::default();
+            self.load_fonts_dir_impl("/ui/fonts".as_ref(), &mut seen);
         }
 
         // Linux.
@@ -410,13 +467,14 @@ impl Database {
 
             #[cfg(not(feature = "fontconfig"))]
             {
-                self.load_fonts_dir("/usr/share/fonts/");
-                self.load_fonts_dir("/usr/local/share/fonts/");
+                let mut seen = Default::default();
+                self.load_fonts_dir_impl("/usr/share/fonts/".as_ref(), &mut seen);
+                self.load_fonts_dir_impl("/usr/local/share/fonts/".as_ref(), &mut seen);
 
                 if let Ok(ref home) = std::env::var("HOME") {
                     let home_path = std::path::Path::new(home);
-                    self.load_fonts_dir(home_path.join(".fonts"));
-                    self.load_fonts_dir(home_path.join(".local/share/fonts"));
+                    self.load_fonts_dir_impl(&home_path.join(".fonts"), &mut seen);
+                    self.load_fonts_dir_impl(&home_path.join(".local/share/fonts"), &mut seen);
                 }
             }
         }
@@ -485,6 +543,7 @@ impl Database {
             }
         }
 
+        let mut seen = Default::default();
         for dir in fontconfig.dirs {
             let path = if dir.path.starts_with("~") {
                 if let Ok(ref home) = home {
@@ -495,7 +554,7 @@ impl Database {
             } else {
                 dir.path
             };
-            self.load_fonts_dir(path);
+            self.load_fonts_dir_impl(&path, &mut seen);
         }
     }
 
