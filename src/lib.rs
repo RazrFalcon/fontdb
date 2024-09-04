@@ -462,21 +462,35 @@ impl Database {
         {
             #[cfg(feature = "fontconfig")]
             {
-                self.load_fontconfig();
+                if !self.load_fontconfig() {
+                    log::warn!("Fallback to loading from known font dir paths.");
+                    self.load_no_fontconfig();
+                }
             }
 
             #[cfg(not(feature = "fontconfig"))]
             {
-                let mut seen = Default::default();
-                self.load_fonts_dir_impl("/usr/share/fonts/".as_ref(), &mut seen);
-                self.load_fonts_dir_impl("/usr/local/share/fonts/".as_ref(), &mut seen);
-
-                if let Ok(ref home) = std::env::var("HOME") {
-                    let home_path = std::path::Path::new(home);
-                    self.load_fonts_dir_impl(&home_path.join(".fonts"), &mut seen);
-                    self.load_fonts_dir_impl(&home_path.join(".local/share/fonts"), &mut seen);
-                }
+                self.load_no_fontconfig();
             }
+        }
+    }
+
+
+    // Linux.
+    #[cfg(all(
+        unix,
+        feature = "fs",
+        not(any(target_os = "macos", target_os = "android"))
+    ))]
+    fn load_no_fontconfig(&mut self) {
+        let mut seen = Default::default();
+        self.load_fonts_dir_impl("/usr/share/fonts/".as_ref(), &mut seen);
+        self.load_fonts_dir_impl("/usr/local/share/fonts/".as_ref(), &mut seen);
+
+        if let Ok(ref home) = std::env::var("HOME") {
+            let home_path = std::path::Path::new(home);
+            self.load_fonts_dir_impl(&home_path.join(".fonts"), &mut seen);
+            self.load_fonts_dir_impl(&home_path.join(".local/share/fonts"), &mut seen);
         }
     }
 
@@ -486,7 +500,7 @@ impl Database {
         feature = "fontconfig",
         not(any(target_os = "macos", target_os = "android"))
     ))]
-    fn load_fontconfig(&mut self) {
+    fn load_fontconfig(&mut self) -> bool {
         use std::path::Path;
 
         let mut fontconfig = fontconfig_parser::FontConfig::default();
@@ -543,6 +557,10 @@ impl Database {
             }
         }
 
+        if fontconfig.dirs.is_empty() {
+            return false;
+        }
+
         let mut seen = Default::default();
         for dir in fontconfig.dirs {
             let path = if dir.path.starts_with("~") {
@@ -556,6 +574,8 @@ impl Database {
             };
             self.load_fonts_dir_impl(&path, &mut seen);
         }
+
+        true
     }
 
     /// Pushes a user-provided `FaceInfo` to the database.
