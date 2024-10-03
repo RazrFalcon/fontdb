@@ -1,3 +1,7 @@
+#[cfg(not(feature = "fs"))]
+fn main() {}
+
+#[cfg(feature = "fs")]
 fn main() {
     std::env::set_var("RUST_LOG", "fontdb=trace");
     env_logger::init();
