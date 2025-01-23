@@ -487,6 +487,11 @@ impl Database {
         self.load_fonts_dir_impl("/usr/share/fonts/".as_ref(), &mut seen);
         self.load_fonts_dir_impl("/usr/local/share/fonts/".as_ref(), &mut seen);
 
+        // Flatpak font directories
+        self.load_fonts_dir_impl("/run/host/fonts/".as_ref(), &mut seen);
+        self.load_fonts_dir_impl("/run/host/local-fonts/".as_ref(), &mut seen);
+        self.load_fonts_dir_impl("/run/host/user-fonts/".as_ref(), &mut seen);
+
         if let Ok(ref home) = std::env::var("HOME") {
             let home_path = std::path::Path::new(home);
             self.load_fonts_dir_impl(&home_path.join(".fonts"), &mut seen);
