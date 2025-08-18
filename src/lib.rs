@@ -70,6 +70,7 @@ use alloc::{
 };
 
 pub use ttf_parser::Language;
+pub use ttf_parser::UnicodeRanges;
 pub use ttf_parser::Width as Stretch;
 
 use slotmap::SlotMap;
@@ -851,6 +852,9 @@ pub struct FaceInfo {
     /// A font face stretch.
     pub stretch: Stretch,
 
+    /// The [UnicodeRanges] of the font if it is defined.
+    pub unicode_ranges: Option<UnicodeRanges>,
+
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
 }
@@ -1034,7 +1038,7 @@ impl Default for Style {
 fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, LoadError> {
     let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
-    let (mut style, weight, stretch) = parse_os2(&raw_face);
+    let (mut style, weight, stretch, unicode_ranges) = parse_os2(&raw_face);
     let (monospaced, italic) = parse_post(&raw_face);
 
     if style == Style::Normal && italic {
@@ -1050,6 +1054,7 @@ fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, 
         style,
         weight,
         stretch,
+        unicode_ranges,
         monospaced,
     })
 }
@@ -1142,14 +1147,14 @@ fn name_to_unicode(name: &ttf_parser::name::Name) -> Option<String> {
     }
 }
 
-fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
+fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch, Option<UnicodeRanges>) {
     const OS2_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"OS/2");
     let table = match raw_face
         .table(OS2_TAG)
         .and_then(ttf_parser::os2::Table::parse)
     {
         Some(table) => table,
-        None => return (Style::Normal, Weight::NORMAL, Stretch::Normal),
+        None => return (Style::Normal, Weight::NORMAL, Stretch::Normal, None),
     };
 
     let style = match table.style() {
@@ -1160,8 +1165,9 @@ fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
 
     let weight = table.weight();
     let stretch = table.width();
+    let unicode_ranges = table.unicode_ranges();
 
-    (style, Weight(weight.to_number()), stretch)
+    (style, Weight(weight.to_number()), stretch, Some(unicode_ranges))
 }
 
 fn parse_post(raw_face: &ttf_parser::RawFace) -> (bool, bool) {
