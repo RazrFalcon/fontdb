@@ -69,8 +69,16 @@ use alloc::{
     vec::Vec,
 };
 
+use read_fonts::{
+    tables::{
+        cmap::PlatformId,
+        name::{Encoding, NameRecord},
+        os2::SelectionFlags,
+    },
+    types::{BigEndian, Fixed, NameId},
+    FileRef, FontData, FontRef, TableProvider as _,
+};
 pub use ttf_parser::Language;
-pub use ttf_parser::Width as Stretch;
 
 use slotmap::SlotMap;
 use tinyvec::TinyVec;
@@ -202,7 +210,15 @@ impl Database {
     /// Will load all font faces in case of a font collection.
     pub fn load_font_source(&mut self, source: Source) -> TinyVec<[ID; 8]> {
         let ids = source.with_data(|data| {
-            let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
+            let Ok(file) = FileRef::new(data) else {
+                log::warn!("Failed to load a font face");
+                return Default::default();
+            };
+
+            let n = match &file {
+                FileRef::Font(_) => 1,
+                FileRef::Collection(collection_ref) => collection_ref.len(),
+            };
             let mut ids = TinyVec::with_capacity(n as usize);
 
             for index in 0..n {
@@ -233,7 +249,16 @@ impl Database {
     fn load_fonts_from_file(&mut self, path: &std::path::Path, data: &[u8]) {
         let source = Source::File(path.into());
 
-        let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
+        let Ok(file) = FileRef::new(data) else {
+            log::warn!("Failed to load a font face from '{}'", path.display());
+            return;
+        };
+
+        let n = match &file {
+            FileRef::Font(_) => 1,
+            FileRef::Collection(collection_ref) => collection_ref.len(),
+        };
+
         for index in 0..n {
             match parse_face_info(source.clone(), data, index) {
                 Ok(info) => {
@@ -475,7 +500,6 @@ impl Database {
         }
     }
 
-
     // Linux.
     #[cfg(all(
         unix,
@@ -714,8 +738,9 @@ impl Database {
     ///
     /// ```ignore
     /// let is_variable = db.with_face_data(id, |font_data, face_index| {
-    ///     let font = ttf_parser::Face::from_slice(font_data, face_index).unwrap();
-    ///     font.is_variable()
+    ///     use read_fonts::TableProvider as _;
+    ///     let font = read_fonts::FontRef::from_index(font_data, face_index).unwrap();
+    ///     font.fvar().is_ok()
     /// })?;
     /// ```
     pub fn with_face_data<P, T>(&self, id: ID, p: P) -> Option<T>
@@ -849,7 +874,7 @@ pub struct FaceInfo {
     pub weight: Weight,
 
     /// A font face stretch.
-    pub stretch: Stretch,
+    pub stretch: Width,
 
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
@@ -940,7 +965,7 @@ pub struct Query<'a> {
     /// Selects a normal, condensed, or expanded face from a font family.
     ///
     /// [font-stretch](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-stretch-prop) in CSS.
-    pub stretch: Stretch,
+    pub stretch: Width,
 
     /// Allows italic or oblique faces to be selected.
     ///
@@ -1013,6 +1038,63 @@ impl Weight {
     pub const BLACK: Weight = Weight(900);
 }
 
+/// A face [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+pub enum Width {
+    UltraCondensed,
+    ExtraCondensed,
+    Condensed,
+    SemiCondensed,
+    Normal,
+    SemiExpanded,
+    Expanded,
+    ExtraExpanded,
+    UltraExpanded,
+}
+
+impl Width {
+    /// Returns a numeric representation of a width.
+    #[inline]
+    pub fn to_number(self) -> u16 {
+        match self {
+            Width::UltraCondensed => 1,
+            Width::ExtraCondensed => 2,
+            Width::Condensed => 3,
+            Width::SemiCondensed => 4,
+            Width::Normal => 5,
+            Width::SemiExpanded => 6,
+            Width::Expanded => 7,
+            Width::ExtraExpanded => 8,
+            Width::UltraExpanded => 9,
+        }
+    }
+
+    /// Returns a numeric representation of a width.
+    #[inline]
+    pub fn from_number(num: u16) -> Self {
+        match num {
+            1 => Width::UltraCondensed,
+            2 => Width::ExtraCondensed,
+            3 => Width::Condensed,
+            4 => Width::SemiCondensed,
+            5 => Width::Normal,
+            6 => Width::SemiExpanded,
+            7 => Width::Expanded,
+            8 => Width::ExtraExpanded,
+            9 => Width::UltraExpanded,
+            _ => Width::Normal,
+        }
+    }
+}
+
+impl Default for Width {
+    #[inline]
+    fn default() -> Self {
+        Width::Normal
+    }
+}
+
 /// Allows italic or oblique faces to be selected.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Style {
@@ -1032,10 +1114,10 @@ impl Default for Style {
 }
 
 fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, LoadError> {
-    let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
-    let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
-    let (mut style, weight, stretch) = parse_os2(&raw_face);
-    let (monospaced, italic) = parse_post(&raw_face);
+    let font_ref = FontRef::from_index(data, index).map_err(|_| LoadError::MalformedFont)?;
+    let (families, post_script_name) = parse_names(&font_ref).ok_or(LoadError::UnnamedFont)?;
+    let (mut style, weight, stretch) = parse_os2(&font_ref);
+    let (monospaced, italic) = parse_post(&font_ref);
 
     if style == Style::Normal && italic {
         style = Style::Italic;
@@ -1054,16 +1136,19 @@ fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, 
     })
 }
 
-fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)>, String)> {
-    const NAME_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"name");
-    let name_data = raw_face.table(NAME_TAG)?;
-    let name_table = ttf_parser::name::Table::parse(name_data)?;
+fn parse_names(font_ref: &FontRef<'_>) -> Option<(Vec<(String, Language)>, String)> {
+    let data = font_ref.data();
+    let name_table = font_ref.name().ok()?;
 
-    let mut families = collect_families(ttf_parser::name_id::TYPOGRAPHIC_FAMILY, &name_table.names);
+    let mut families = collect_families(
+        NameId::TYPOGRAPHIC_FAMILY_NAME,
+        &name_table.name_record(),
+        data,
+    );
 
     // We have to fallback to Family Name when no Typographic Family Name was set.
     if families.is_empty() {
-        families = collect_families(ttf_parser::name_id::FAMILY, &name_table.names);
+        families = collect_families(NameId::FAMILY_NAME, &name_table.name_record(), data);
     }
 
     // Make English US the first one.
@@ -1083,21 +1168,23 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
     }
 
     let post_script_name = name_table
-        .names
+        .name_record()
         .into_iter()
-        .find(|name| {
-            name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_supported_encoding()
-        })
-        .and_then(|name| name_to_unicode(&name))?;
+        .find(|name| name.name_id() == NameId::POSTSCRIPT_NAME && name.is_supported_encoding())
+        .and_then(|name| name_to_unicode(&name, data))?;
 
     Some((families, post_script_name))
 }
 
-fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(String, Language)> {
+fn collect_families(
+    name_id: NameId,
+    names: &[NameRecord],
+    data: FontData<'_>,
+) -> Vec<(String, Language)> {
     let mut families = Vec::new();
     for name in names.into_iter() {
         if name.name_id == name_id && name.is_unicode() {
-            if let Some(family) = name_to_unicode(&name) {
+            if let Some(family) = name_to_unicode(&name, data) {
                 families.push((family, name.language()));
             }
         }
@@ -1110,7 +1197,7 @@ fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(Strin
     {
         for name in names.into_iter() {
             if name.name_id == name_id && name.is_mac_roman() {
-                if let Some(family) = name_to_unicode(&name) {
+                if let Some(family) = name_to_unicode(&name, data) {
                     families.push((family, name.language()));
                     break;
                 }
@@ -1121,64 +1208,40 @@ fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(Strin
     families
 }
 
-fn name_to_unicode(name: &ttf_parser::name::Name) -> Option<String> {
-    if name.is_unicode() {
-        let mut raw_data: Vec<u16> = Vec::new();
-        for c in ttf_parser::LazyArray16::<u16>::new(name.name) {
-            raw_data.push(c);
-        }
+fn name_to_unicode(name: &NameRecord, data: FontData<'_>) -> Option<String> {
+    name.string(data).ok().map(|name| name.chars().collect())
+}
 
-        String::from_utf16(&raw_data).ok()
-    } else if name.is_mac_roman() {
-        // We support only MacRoman encoding here, which should be enough in most cases.
-        let mut raw_data = Vec::with_capacity(name.name.len());
-        for b in name.name {
-            raw_data.push(MAC_ROMAN[*b as usize]);
-        }
+fn parse_os2(font_ref: &FontRef<'_>) -> (Style, Weight, Width) {
+    let Ok(table) = font_ref.os2() else {
+        return (Style::Normal, Weight::NORMAL, Width::Normal);
+    };
 
-        String::from_utf16(&raw_data).ok()
+    let flags = table.fs_selection();
+    let style = if flags.contains(SelectionFlags::ITALIC) {
+        Style::Italic
+    } else if table.version() >= 4 && flags.contains(SelectionFlags::OBLIQUE) {
+        Style::Oblique
     } else {
-        None
-    }
-}
-
-fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
-    const OS2_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"OS/2");
-    let table = match raw_face
-        .table(OS2_TAG)
-        .and_then(ttf_parser::os2::Table::parse)
-    {
-        Some(table) => table,
-        None => return (Style::Normal, Weight::NORMAL, Stretch::Normal),
+        Style::Normal
     };
 
-    let style = match table.style() {
-        ttf_parser::Style::Normal => Style::Normal,
-        ttf_parser::Style::Italic => Style::Italic,
-        ttf_parser::Style::Oblique => Style::Oblique,
-    };
+    let weight = Weight(table.us_weight_class());
+    let stretch = Width::from_number(table.us_weight_class());
 
-    let weight = table.weight();
-    let stretch = table.width();
-
-    (style, Weight(weight.to_number()), stretch)
+    (style, weight, stretch)
 }
 
-fn parse_post(raw_face: &ttf_parser::RawFace) -> (bool, bool) {
-    // We need just a single value from the `post` table, while ttf-parser will parse all.
-    // Therefore we have a custom parser.
-
-    const POST_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"post");
-    let data = match raw_face.table(POST_TAG) {
-        Some(v) => v,
-        None => return (false, false),
+fn parse_post(font_ref: &FontRef<'_>) -> (bool, bool) {
+    let Ok(table) = font_ref.post() else {
+        return (false, false);
     };
 
     // All we care about, it that u32 at offset 12 is non-zero.
-    let monospaced = data.get(12..16) != Some(&[0, 0, 0, 0]);
+    let monospaced = table.is_fixed_pitch() != 0;
 
     // Italic angle as f16.16.
-    let italic = data.get(4..8) != Some(&[0, 0, 0, 0]);
+    let italic = table.italic_angle() != Fixed::from_i32(0);
 
     (monospaced, italic)
 }
@@ -1188,14 +1251,13 @@ trait NameExt {
     fn is_supported_encoding(&self) -> bool;
 }
 
-impl NameExt for ttf_parser::name::Name<'_> {
+impl NameExt for NameRecord {
     #[inline]
     fn is_mac_roman(&self) -> bool {
-        use ttf_parser::PlatformId::Macintosh;
         // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-encoding-ids-script-manager-codes
         const MACINTOSH_ROMAN_ENCODING_ID: u16 = 0;
-
-        self.platform_id == Macintosh && self.encoding_id == MACINTOSH_ROMAN_ENCODING_ID
+        self.platform_id == (PlatformId::Macintosh as u16)
+            && self.encoding_id == MACINTOSH_ROMAN_ENCODING_ID
     }
 
     #[inline]
@@ -1220,7 +1282,7 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     let matching_stretch = if matches {
         // Exact match.
         query.stretch
-    } else if query.stretch <= Stretch::Normal {
+    } else if query.stretch <= Width::Normal {
         // Closest stretch, first checking narrower values and then wider values.
         let stretch = matching_set
             .iter()
