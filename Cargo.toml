@@ -15,6 +15,7 @@ rust-version = "1.80"
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.9", optional = true }
+read-fonts = "0.35.0"
 slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
@@ -31,7 +32,7 @@ env_logger = { version = "0.10", default-features = false }
 
 [features]
 default = ["std", "fs", "memmap", "fontconfig"]
-std = ["ttf-parser/std"]
+std = ["read-fonts/std"]
 # Allows local filesystem interactions.
 fs = ["std"]
 # Allows font files memory mapping, greatly improves performance.
