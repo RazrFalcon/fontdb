@@ -1054,17 +1054,24 @@ fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<Vec<FaceIn
         style = Style::Italic;
     }
 
-    Ok(vec![FaceInfo {
-        id: ID::dummy(),
-        source,
-        index,
-        families,
-        post_script_name,
-        style,
-        weights,
-        stretch,
-        monospaced,
-    }])
+    // WARNING THIS IS WRONG
+    // should return FaceInfo<vec of weights> OR Vec<FaceInfo>
+    let fonts = weights
+        .iter()
+        .map(|_w| FaceInfo {
+            id: ID::dummy(),
+            source: source.clone(),
+            index,
+            families: families.clone(),
+            post_script_name: post_script_name.clone(),
+            style,
+            weights: weights.clone(), // wrong
+            stretch,
+            monospaced,
+        })
+        .collect();
+
+    Ok(fonts)
 }
 
 fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)>, String)> {
