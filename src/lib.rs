@@ -876,7 +876,7 @@ pub struct FaceInfo {
     pub weight: Weight,
 
     /// A font face stretch.
-    pub stretch: Width,
+    pub stretch: Stretch,
 
     /// Indicates that the font face is monospaced.
     pub monospaced: bool,
@@ -967,7 +967,7 @@ pub struct Query<'a> {
     /// Selects a normal, condensed, or expanded face from a font family.
     ///
     /// [font-stretch](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-stretch-prop) in CSS.
-    pub stretch: Width,
+    pub stretch: Stretch,
 
     /// Allows italic or oblique faces to be selected.
     ///
@@ -1043,7 +1043,7 @@ impl Weight {
 /// A face [width](https://docs.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Width {
+pub enum Stretch {
     UltraCondensed,
     ExtraCondensed,
     Condensed,
@@ -1055,20 +1055,20 @@ pub enum Width {
     UltraExpanded,
 }
 
-impl Width {
+impl Stretch {
     /// Returns a numeric representation of a width.
     #[inline]
     pub fn to_number(self) -> u16 {
         match self {
-            Width::UltraCondensed => 1,
-            Width::ExtraCondensed => 2,
-            Width::Condensed => 3,
-            Width::SemiCondensed => 4,
-            Width::Normal => 5,
-            Width::SemiExpanded => 6,
-            Width::Expanded => 7,
-            Width::ExtraExpanded => 8,
-            Width::UltraExpanded => 9,
+            Stretch::UltraCondensed => 1,
+            Stretch::ExtraCondensed => 2,
+            Stretch::Condensed => 3,
+            Stretch::SemiCondensed => 4,
+            Stretch::Normal => 5,
+            Stretch::SemiExpanded => 6,
+            Stretch::Expanded => 7,
+            Stretch::ExtraExpanded => 8,
+            Stretch::UltraExpanded => 9,
         }
     }
 
@@ -1076,24 +1076,24 @@ impl Width {
     #[inline]
     pub fn from_number(num: u16) -> Self {
         match num {
-            1 => Width::UltraCondensed,
-            2 => Width::ExtraCondensed,
-            3 => Width::Condensed,
-            4 => Width::SemiCondensed,
-            5 => Width::Normal,
-            6 => Width::SemiExpanded,
-            7 => Width::Expanded,
-            8 => Width::ExtraExpanded,
-            9 => Width::UltraExpanded,
-            _ => Width::Normal,
+            1 => Stretch::UltraCondensed,
+            2 => Stretch::ExtraCondensed,
+            3 => Stretch::Condensed,
+            4 => Stretch::SemiCondensed,
+            5 => Stretch::Normal,
+            6 => Stretch::SemiExpanded,
+            7 => Stretch::Expanded,
+            8 => Stretch::ExtraExpanded,
+            9 => Stretch::UltraExpanded,
+            _ => Stretch::Normal,
         }
     }
 }
 
-impl Default for Width {
+impl Default for Stretch {
     #[inline]
     fn default() -> Self {
-        Width::Normal
+        Stretch::Normal
     }
 }
 
@@ -1194,9 +1194,9 @@ fn collect_families(font: &FontRef<'_>, name_id: StringId) -> Vec<(String, Langu
     families
 }
 
-fn parse_os2(font_ref: &FontRef<'_>) -> (Style, Weight, Width) {
+fn parse_os2(font_ref: &FontRef<'_>) -> (Style, Weight, Stretch) {
     let Ok(table) = font_ref.os2() else {
-        return (Style::Normal, Weight::NORMAL, Width::Normal);
+        return (Style::Normal, Weight::NORMAL, Stretch::Normal);
     };
 
     let flags = table.fs_selection();
@@ -1209,7 +1209,7 @@ fn parse_os2(font_ref: &FontRef<'_>) -> (Style, Weight, Width) {
     };
 
     let weight = Weight(table.us_weight_class());
-    let stretch = Width::from_number(table.us_weight_class());
+    let stretch = Stretch::from_number(table.us_weight_class());
 
     (style, weight, stretch)
 }
@@ -1244,7 +1244,7 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     let matching_stretch = if matches {
         // Exact match.
         query.stretch
-    } else if query.stretch <= Width::Normal {
+    } else if query.stretch <= Stretch::Normal {
         // Closest stretch, first checking narrower values and then wider values.
         let stretch = matching_set
             .iter()
