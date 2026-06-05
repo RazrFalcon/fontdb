@@ -15,7 +15,7 @@ rust-version = "1.80"
 [dependencies]
 log = "0.4"
 memmap2 = { version = "0.9", optional = true }
-read-fonts = "0.35.0"
+read-fonts = "0.39.0"
 slotmap = { version = "1.0.6", default-features = false }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 
