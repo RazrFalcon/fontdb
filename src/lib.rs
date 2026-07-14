@@ -889,7 +889,7 @@ pub struct FaceInfo {
 /// Stores the whole font and not just a single face.
 #[derive(Clone)]
 pub enum Source {
-    /// A font's raw data, typically backed by a Vec<u8>.
+    /// A font's raw data, typically backed by a `Vec<u8>`.
     Binary(alloc::sync::Arc<dyn AsRef<[u8]> + Sync + Send>),
 
     /// A font's path.
