@@ -76,7 +76,20 @@ use read_fonts::{
 };
 
 mod string;
-pub use string::{Language, StringId};
+use string::{Language as FontationsLanguage, StringId};
+
+// Newtype around the Fontations language to keep it out of the public API
+// This allows us to update Fontations versions in patch releases.
+
+/// An owned BCP-47 language identifier for the localized string.
+#[derive(Copy, Clone, Debug)]
+pub struct Language(FontationsLanguage);
+impl Language {
+    /// Returns the BCP-47 language identifier for the language
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 #[cfg(feature = "std")]
 /// Generic atomically reference counted shared data
@@ -1186,7 +1199,7 @@ fn collect_families(font: &FontRef<'_>, name_id: StringId) -> Vec<(String, Langu
         let lang = s.language();
         if !name.is_empty() {
             if let Some(lang) = lang {
-                families.push((name, lang));
+                families.push((name, Language(lang)));
             }
         }
     }
