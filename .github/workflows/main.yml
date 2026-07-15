@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.80.0
+          - 1.85.0
           - stable
     steps:
     - name: Checkout
