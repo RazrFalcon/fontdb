@@ -15,14 +15,12 @@ jobs:
           - stable
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
-    - name: Install toolchain
-      uses: actions-rs/toolchain@v1
+    - name: install stable
+      uses: dtolnay/rust-toolchain@master
       with:
-        profile: minimal
         toolchain: ${{ matrix.rust }}
-        override: true
 
     - name: Build without default features
       run: cargo build --no-default-features
@@ -43,14 +41,12 @@ jobs:
     runs-on: windows-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
-    - name: Install toolchain
-      uses: actions-rs/toolchain@v1
+    - name: install stable
+      uses: dtolnay/rust-toolchain@master
       with:
-        profile: minimal
         toolchain: stable
-        override: true
 
     - name: Build without default features
       run: cargo build --no-default-features
@@ -68,14 +64,12 @@ jobs:
     runs-on: macos-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
-    - name: Install toolchain
-      uses: actions-rs/toolchain@v1
+    - name: install stable
+      uses: dtolnay/rust-toolchain@master
       with:
-        profile: minimal
         toolchain: stable
-        override: true
 
     - name: Build without default features
       run: cargo build --no-default-features
