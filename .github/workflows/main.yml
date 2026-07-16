@@ -6,13 +6,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
+
+  build-linux-msrv:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - 1.60.0
-          - stable
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -21,7 +17,35 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: ${{ matrix.rust }}
+        toolchain: 1.60.0
+        override: true
+
+    - name: Build without default features
+      run: cargo build -p fontdb --no-default-features
+
+    - name: Build with fs
+      run: cargo build -p fontdb --no-default-features --features fs
+
+    - name: Build with memmap
+      run: cargo build -p fontdb --no-default-features --features memmap
+
+    - name: Build with fontconfig
+      run: cargo build -p fontdb --no-default-features --features fontconfig
+
+    - name: Run tests
+      run: cargo test -p fontdb
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
         override: true
 
     - name: Build without default features
