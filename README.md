@@ -2,7 +2,7 @@
 [![Build Status](https://github.com/RazrFalcon/fontdb/actions/workflows/main.yml/badge.svg)](https://github.com/RazrFalcon/fontdb/actions/workflows/main.yml)
 [![Crates.io](https://img.shields.io/crates/v/fontdb.svg)](https://crates.io/crates/fontdb)
 [![Documentation](https://docs.rs/fontdb/badge.svg)](https://docs.rs/fontdb)
-[![Rust 1.60+](https://img.shields.io/badge/rust-1.60+-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.71+](https://img.shields.io/badge/rust-1.71+-orange.svg)](https://www.rust-lang.org)
 
 `fontdb` is a simple, in-memory font database with CSS-like queries.
 
