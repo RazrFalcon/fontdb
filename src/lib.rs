@@ -63,6 +63,8 @@ then you can use the unsafe [`Database::make_shared_face_data`] function.
 
 extern crate alloc;
 
+mod ttf_parser;
+
 #[cfg(not(feature = "std"))]
 use alloc::{
     string::{String, ToString},
