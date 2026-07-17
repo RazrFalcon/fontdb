@@ -174,7 +174,7 @@ impl Database {
     /// - `serif` - Times New Roman
     /// - `sans-serif` - Arial
     /// - `cursive` - Comic Sans MS
-    /// - `fantasy` - Impact (Papyrus on macOS)
+    /// - `fantasy` - Impact (Papyrus on macOS/iOS)
     /// - `monospace` - Courier New
     #[inline]
     pub fn new() -> Self {
@@ -183,9 +183,9 @@ impl Database {
             family_serif: "Times New Roman".to_string(),
             family_sans_serif: "Arial".to_string(),
             family_cursive: "Comic Sans MS".to_string(),
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "ios")))]
             family_fantasy: "Impact".to_string(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
             family_fantasy: "Papyrus".to_string(),
             family_monospace: "Courier New".to_string(),
         }
@@ -423,7 +423,7 @@ impl Database {
             }
         }
 
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
             let mut seen = Default::default();
             self.load_fonts_dir_impl("/Library/Fonts".as_ref(), &mut seen);
@@ -460,7 +460,7 @@ impl Database {
         }
 
         // Linux.
-        #[cfg(all(unix, not(any(target_os = "macos", target_os = "android"))))]
+        #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))]
         {
             #[cfg(feature = "fontconfig")]
             {
@@ -482,7 +482,7 @@ impl Database {
     #[cfg(all(
         unix,
         feature = "fs",
-        not(any(target_os = "macos", target_os = "android"))
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
     fn load_no_fontconfig(&mut self) {
         let mut seen = Default::default();
@@ -500,7 +500,7 @@ impl Database {
     #[cfg(all(
         unix,
         feature = "fontconfig",
-        not(any(target_os = "macos", target_os = "android"))
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
     fn load_fontconfig(&mut self) -> bool {
         use std::path::Path;
