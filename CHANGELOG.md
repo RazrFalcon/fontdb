@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-29
+### Added
+- Support loading system fonts on iOS.
+
+### Changed
+- `fontdb` no longer depends on `ttf-parser`. It vendors a minimal subset instead.
+- MSRV bumped to 1.71 due to `log`.
+
 ## [0.23.0] - 2024-10-09
 ### Changed
 - `ttf-parser` updated.
@@ -221,7 +229,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Stretch processing. `ttf-parser` was incorrectly parsing this property.
 
-[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/RazrFalcon/fontdb/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/RazrFalcon/fontdb/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/RazrFalcon/fontdb/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/RazrFalcon/fontdb/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/RazrFalcon/fontdb/compare/v0.20.0...v0.21.0
