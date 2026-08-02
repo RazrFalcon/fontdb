@@ -1090,9 +1090,68 @@ fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)
         .find(|name| {
             name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME && name.is_supported_encoding()
         })
-        .and_then(|name| name_to_unicode(&name))?;
+        .and_then(|name| name_to_unicode(&name))
+        .or_else(|| {
+            let style = find_english_name(&name_table.names, ttf_parser::name_id::TYPOGRAPHIC_SUBFAMILY)
+                .or_else(|| find_english_name(&name_table.names, ttf_parser::name_id::SUBFAMILY))
+                .unwrap_or_default();
+            synthesize_postscript_name(&families[0].0, &style)
+        })?;
 
     Some((families, post_script_name))
+}
+
+fn find_english_name(names: &ttf_parser::name::Names, name_id: u16) -> Option<String> {
+    let mut fallback: Option<ttf_parser::name::Name> = None;
+    for name in names.into_iter() {
+        if name.name_id != name_id || !name.is_supported_encoding() {
+            continue;
+        }
+        if name.language() == Language::English_UnitedStates {
+            return name_to_unicode(&name);
+        }
+        fallback.get_or_insert(name);
+    }
+    fallback.and_then(|n| name_to_unicode(&n))
+}
+
+fn synthesize_postscript_name(family: &str, style: &str) -> Option<String> {
+    const FORBIDDEN: &[char] = &['(', ')', '<', '>', '[', ']', '{', '}', '/', '%'];
+    const MAX: usize = 63;
+    const MIN_FAMILY: usize = 16;
+    const MAX_STYLE: usize = MAX - 1 - MIN_FAMILY; // 46
+
+    fn sanitize(s: &str) -> String {
+        s.chars()
+            .filter(|c| matches!(*c as u32, 0x21..=0x7E) && !FORBIDDEN.contains(c))
+            .collect()
+    }
+
+    let mut family = sanitize(family);
+    if family.is_empty() {
+        return None;
+    }
+
+    let style = if style.is_empty() || style.eq_ignore_ascii_case("regular") {
+        String::new()
+    } else {
+        sanitize(style)
+    };
+
+    if style.is_empty() {
+        family.truncate(MAX);
+        return Some(family);
+    }
+
+    if style.len() > MAX_STYLE {
+        return None;
+    }
+
+    // Reserve room for "-Style", truncating the family if needed.
+    family.truncate(MAX - 1 - style.len());
+    family.push('-');
+    family.push_str(&style);
+    Some(family)
 }
 
 fn collect_families(name_id: u16, names: &ttf_parser::name::Names) -> Vec<(String, Language)> {
