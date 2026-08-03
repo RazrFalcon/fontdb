@@ -477,7 +477,6 @@ impl Database {
         }
     }
 
-
     // Linux.
     #[cfg(all(
         unix,
@@ -666,7 +665,11 @@ impl Database {
             let candidates: Vec<_> = self
                 .faces
                 .iter()
-                .filter(|(_, face)| face.families.iter().any(|family| family.0 == name))
+                .filter(|(_, face)| {
+                    face.families
+                        .iter()
+                        .any(|family| family.0.eq_ignore_ascii_case(name))
+                })
                 .map(|(_, info)| info)
                 .collect();
 
