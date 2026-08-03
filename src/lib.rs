@@ -72,6 +72,7 @@ use alloc::{
 };
 
 pub use ttf_parser::Language;
+use ttf_parser::VariationAxis;
 pub use ttf_parser::Width as Stretch;
 
 use slotmap::SlotMap;
@@ -209,12 +210,14 @@ impl Database {
 
             for index in 0..n {
                 match parse_face_info(source.clone(), data, index) {
-                    Ok(mut info) => {
-                        let id = self.faces.insert_with_key(|k| {
-                            info.id = ID(k);
-                            info
-                        });
-                        ids.push(ID(id));
+                    Ok(infos) => {
+                        for mut info in infos {
+                            let id = self.faces.insert_with_key(|k| {
+                                info.id = ID(k);
+                                info
+                            });
+                            ids.push(ID(id));
+                        }
                     }
                     Err(e) => log::warn!(
                         "Failed to load a font face {} from source cause {}.",
@@ -238,8 +241,10 @@ impl Database {
         let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
         for index in 0..n {
             match parse_face_info(source.clone(), data, index) {
-                Ok(info) => {
-                    self.push_face_info(info);
+                Ok(infos) => {
+                    for info in infos {
+                        self.push_face_info(info);
+                    }
                 }
                 Err(e) => {
                     log::warn!(
@@ -476,7 +481,6 @@ impl Database {
             }
         }
     }
-
 
     // Linux.
     #[cfg(all(
@@ -848,7 +852,7 @@ pub struct FaceInfo {
     pub style: Style,
 
     /// A font face weight.
-    pub weight: Weight,
+    pub weights: Vec<WeightProp>,
 
     /// A font face stretch.
     pub stretch: Stretch,
@@ -994,6 +998,15 @@ impl Default for Weight {
     }
 }
 
+/// Weight Prop - static or variable
+#[derive(Clone, Copy, Debug)]
+pub enum WeightProp {
+    /// Static Weight
+    Weight(Weight),
+    /// Variable Weight
+    VariableFont(VariationAxis),
+}
+
 impl Weight {
     /// Thin weight (100), the thinnest value.
     pub const THIN: Weight = Weight(100);
@@ -1033,27 +1046,34 @@ impl Default for Style {
     }
 }
 
-fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<FaceInfo, LoadError> {
+fn parse_face_info(source: Source, data: &[u8], index: u32) -> Result<Vec<FaceInfo>, LoadError> {
     let raw_face = ttf_parser::RawFace::parse(data, index).map_err(|_| LoadError::MalformedFont)?;
     let (families, post_script_name) = parse_names(&raw_face).ok_or(LoadError::UnnamedFont)?;
-    let (mut style, weight, stretch) = parse_os2(&raw_face);
+    let (mut style, weights, stretch) = parse_os2(&raw_face);
     let (monospaced, italic) = parse_post(&raw_face);
 
     if style == Style::Normal && italic {
         style = Style::Italic;
     }
 
-    Ok(FaceInfo {
-        id: ID::dummy(),
-        source,
-        index,
-        families,
-        post_script_name,
-        style,
-        weight,
-        stretch,
-        monospaced,
-    })
+    // WARNING THIS IS WRONG
+    // should return FaceInfo<vec of weights> OR Vec<FaceInfo>
+    let fonts = weights
+        .iter()
+        .map(|_w| FaceInfo {
+            id: ID::dummy(),
+            source: source.clone(),
+            index,
+            families: families.clone(),
+            post_script_name: post_script_name.clone(),
+            style,
+            weights: weights.clone(), // wrong
+            stretch,
+            monospaced,
+        })
+        .collect();
+
+    Ok(fonts)
 }
 
 fn parse_names(raw_face: &ttf_parser::RawFace) -> Option<(Vec<(String, Language)>, String)> {
@@ -1144,14 +1164,24 @@ fn name_to_unicode(name: &ttf_parser::name::Name) -> Option<String> {
     }
 }
 
-fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
+fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Vec<WeightProp>, Stretch) {
     const OS2_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"OS/2");
+    const FVAR_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"fvar");
+    const WGHT_TAG: ttf_parser::Tag = ttf_parser::Tag::from_bytes(b"WGHT");
+    let variable_weight = raw_face
+        .table(FVAR_TAG)
+        .and_then(ttf_parser::fvar::Table::parse)
+        .and_then(|t| t.axes.into_iter().find(|axis| axis.tag == WGHT_TAG))
+        .map(WeightProp::VariableFont);
     let table = match raw_face
         .table(OS2_TAG)
         .and_then(ttf_parser::os2::Table::parse)
     {
         Some(table) => table,
-        None => return (Style::Normal, Weight::NORMAL, Stretch::Normal),
+        None => {
+            let weight = variable_weight.unwrap_or(WeightProp::Weight(Weight::NORMAL));
+            return (Style::Normal, vec![weight], Stretch::Normal);
+        }
     };
 
     let style = match table.style() {
@@ -1160,10 +1190,14 @@ fn parse_os2(raw_face: &ttf_parser::RawFace) -> (Style, Weight, Stretch) {
         ttf_parser::Style::Oblique => Style::Oblique,
     };
 
-    let weight = table.weight();
     let stretch = table.width();
+    let static_weight = WeightProp::Weight(Weight(table.weight().to_number()));
+    let mut weights = vec![static_weight];
+    if let Some(variable) = variable_weight {
+        weights.push(variable);
+    }
 
-    (style, Weight(weight.to_number()), stretch)
+    (style, weights, stretch)
 }
 
 fn parse_post(raw_face: &ttf_parser::RawFace) -> (bool, bool) {
@@ -1283,59 +1317,109 @@ fn find_best_match(candidates: &[&FaceInfo], query: &Query) -> Option<usize> {
     // just use 450 as the cutoff.
     let weight = query.weight.0;
 
-    let matching_weight = if matching_set
-        .iter()
-        .any(|&index| candidates[index].weight.0 == weight)
-    {
+    // Check variable font
+    if let Some(index_variable_font) = matching_set.iter().find(|index| {
+        candidates[**index].weights.iter().any(|w| {
+            let weight = weight as f32;
+            match w {
+                WeightProp::VariableFont(axis) => {
+                    axis.min_value <= weight && weight <= axis.max_value
+                }
+                _ => false,
+            }
+        })
+    }) {
+        return Some(*index_variable_font);
+    }
+
+    let matching_weight = if matching_set.iter().any(|&index| {
+        candidates[index].weights.iter().any(|w| match w {
+            WeightProp::Weight(Weight(weight_num)) => *weight_num == weight,
+            _ => false,
+        })
+    }) {
         Weight(weight)
     } else if (400..450).contains(&weight)
-        && matching_set
-            .iter()
-            .any(|&index| candidates[index].weight.0 == 500)
+        && matching_set.iter().any(|&index| {
+            candidates[index].weights.iter().any(|w| match w {
+                WeightProp::Weight(Weight(weight_num)) => *weight_num == 500,
+                _ => false,
+            })
+        })
     {
         // Check 500 first.
         Weight::MEDIUM
     } else if (450..=500).contains(&weight)
-        && matching_set
-            .iter()
-            .any(|&index| candidates[index].weight.0 == 400)
+        && matching_set.iter().any(|&index| {
+            candidates[index].weights.iter().any(|w| match w {
+                WeightProp::Weight(Weight(weight_num)) => *weight_num == 400,
+                _ => false,
+            })
+        })
     {
         // Check 400 first.
         Weight::NORMAL
     } else if weight <= 500 {
         // Closest weight, first checking thinner values and then fatter ones.
-        let idx = matching_set
+        let close_w = matching_set
             .iter()
-            .filter(|&&index| candidates[index].weight.0 <= weight)
-            .min_by_key(|&&index| weight - candidates[index].weight.0);
-
-        match idx {
-            Some(&matching_index) => candidates[matching_index].weight,
-            None => {
-                let matching_index = *matching_set
-                    .iter()
-                    .min_by_key(|&&index| candidates[index].weight.0 - weight)?;
-                candidates[matching_index].weight
-            }
+            .filter_map(|&index| {
+                let weight_found = candidates[index].weights.iter().find_map(|w| match *w {
+                    WeightProp::Weight(weight_num) if weight_num.0 <= weight => Some(weight_num),
+                    _ => None,
+                });
+                weight_found
+            })
+            .min_by_key(|&w| weight - w.0);
+        match close_w {
+            Some(w) => w,
+            None => matching_set
+                .iter()
+                .filter_map(|&index| {
+                    let weight_found = candidates[index].weights.iter().find_map(|w| match *w {
+                        WeightProp::Weight(weight_num) if weight_num.0 <= weight => {
+                            Some(weight_num)
+                        }
+                        _ => None,
+                    });
+                    weight_found
+                })
+                .min_by_key(|&w| w.0 - weight)?,
         }
     } else {
         // Closest weight, first checking fatter values and then thinner ones.
-        let idx = matching_set
+        let close_w = matching_set
             .iter()
-            .filter(|&&index| candidates[index].weight.0 >= weight)
-            .min_by_key(|&&index| candidates[index].weight.0 - weight);
+            .filter_map(|&index| {
+                candidates[index].weights.iter().find_map(|w| match *w {
+                    WeightProp::Weight(weight_num) if weight_num.0 >= weight => Some(weight_num),
+                    _ => None,
+                })
+            })
+            .min_by_key(|&w| w.0 - weight);
 
-        match idx {
-            Some(&matching_index) => candidates[matching_index].weight,
-            None => {
-                let matching_index = *matching_set
-                    .iter()
-                    .min_by_key(|&&index| weight - candidates[index].weight.0)?;
-                candidates[matching_index].weight
-            }
+        match close_w {
+            Some(w) => w,
+            None => matching_set
+                .iter()
+                .filter_map(|&index| {
+                    let weight_found = candidates[index].weights.iter().find_map(|w| match *w {
+                        WeightProp::Weight(weight_num) if weight_num.0 <= weight => {
+                            Some(weight_num)
+                        }
+                        _ => None,
+                    });
+                    weight_found
+                })
+                .min_by_key(|&w| weight - w.0)?,
         }
     };
-    matching_set.retain(|&index| candidates[index].weight == matching_weight);
+    matching_set.retain(|&index| {
+        candidates[index].weights.iter().any(|w| match *w {
+            WeightProp::Weight(weight_cand) => weight_cand == matching_weight,
+            _ => false,
+        })
+    });
 
     // Ignore step 4d (`font-size`).
 
