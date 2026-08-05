@@ -360,27 +360,30 @@ impl Database {
         dir: &std::path::Path,
         seen: &mut std::collections::HashSet<std::path::PathBuf>,
     ) {
+        #[rustfmt::skip] // keep extensions match as is
+        fn is_font(path: &std::path::Path) -> bool {
+            matches!(path.extension().and_then(|e| e.to_str()),
+                Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
+                Some("otf") | Some("otc") | Some("OTF") | Some("OTC"))
+        }
         let fonts_dir = match std::fs::read_dir(dir) {
             Ok(dir) => dir,
             Err(_) => return,
         };
 
         for entry in fonts_dir.flatten() {
-            let (path, file_type) = match self.canonicalize(entry.path(), entry, seen) {
+            let path = entry.path();
+            let original_is_font = is_font(&path);
+            let (path, file_type) = match self.canonicalize(path, entry, seen) {
                 Some(v) => v,
                 None => continue,
             };
 
             if file_type.is_file() {
-                match path.extension().and_then(|e| e.to_str()) {
-                    #[rustfmt::skip] // keep extensions match as is
-                    Some("ttf") | Some("ttc") | Some("TTF") | Some("TTC") |
-                    Some("otf") | Some("otc") | Some("OTF") | Some("OTC") => {
-                        if let Err(e) = self.load_font_file(&path) {
-                            log::warn!("Failed to load '{}' cause {}.", path.display(), e);
-                        }
-                    },
-                    _ => {}
+                if original_is_font || is_font(&path) {
+                    if let Err(e) = self.load_font_file(&path) {
+                        log::warn!("Failed to load '{}' cause {}.", path.display(), e);
+                    }
                 }
             } else if file_type.is_dir() {
                 self.load_fonts_dir_impl(&path, seen);
