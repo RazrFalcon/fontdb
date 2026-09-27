@@ -464,10 +464,7 @@ impl Database {
         {
             #[cfg(feature = "fontconfig")]
             {
-                if !self.load_fontconfig() {
-                    log::warn!("Fallback to loading from known font dir paths.");
-                    self.load_no_fontconfig();
-                }
+                self.load_fontconfig();
             }
 
             #[cfg(not(feature = "fontconfig"))]
@@ -502,7 +499,7 @@ impl Database {
         feature = "fontconfig",
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
-    fn load_fontconfig(&mut self) -> bool {
+    fn load_fontconfig(&mut self) {
         use std::path::Path;
 
         let mut fontconfig = fontconfig_parser::FontConfig::default();
@@ -534,50 +531,83 @@ impl Database {
             let _ = fontconfig.merge_config(Path::new("/etc/fonts/fonts.conf"));
         }
 
-        for fontconfig_parser::Alias {
-            alias,
-            default,
-            prefer,
-            accept,
-        } in fontconfig.aliases
-        {
-            let name = prefer
-                .get(0)
-                .or_else(|| accept.get(0))
-                .or_else(|| default.get(0));
-
-            if let Some(name) = name {
-                match alias.to_lowercase().as_str() {
-                    "serif" => self.set_serif_family(name),
-                    "sans-serif" => self.set_sans_serif_family(name),
-                    "sans serif" => self.set_sans_serif_family(name),
-                    "monospace" => self.set_monospace_family(name),
-                    "cursive" => self.set_cursive_family(name),
-                    "fantasy" => self.set_fantasy_family(name),
-                    _ => {}
-                }
+        if fontconfig.dirs.is_empty() {
+            log::warn!("Fallback to loading from known font dir paths.");
+            self.load_no_fontconfig();
+        } else {
+            let mut seen = Default::default();
+            for dir in fontconfig.dirs {
+                let path = if dir.path.starts_with("~") {
+                    if let Ok(ref home) = home {
+                        Path::new(home).join(dir.path.strip_prefix("~").unwrap())
+                    } else {
+                        continue;
+                    }
+                } else {
+                    dir.path
+                };
+                self.load_fonts_dir_impl(&path, &mut seen);
             }
         }
 
-        if fontconfig.dirs.is_empty() {
-            return false;
-        }
+        self.set_generic_families_from_fontconfig(&fontconfig.aliases);
+    }
 
-        let mut seen = Default::default();
-        for dir in fontconfig.dirs {
-            let path = if dir.path.starts_with("~") {
-                if let Ok(ref home) = home {
-                    Path::new(home).join(dir.path.strip_prefix("~").unwrap())
-                } else {
-                    continue;
-                }
-            } else {
-                dir.path
-            };
-            self.load_fonts_dir_impl(&path, &mut seen);
-        }
+    /// Sets each generic family to the first installed family in the order fontconfig tries them:
+    /// the `prefer` families of its aliases, then their `accept` families
+    /// (the last alias first, since each is inserted right after the generic family),
+    /// then their `default` families.
+    /// Without an installed one, it's set to the first family fontconfig tries.
+    #[cfg(all(
+        unix,
+        feature = "fontconfig",
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    fn set_generic_families_from_fontconfig(&mut self, aliases: &[fontconfig_parser::Alias]) {
+        let resolve = |db: &Self, generic: &[&str]| {
+            let aliases: Vec<_> = aliases
+                .iter()
+                .filter(|alias| generic.contains(&alias.alias.to_lowercase().as_str()))
+                .collect();
+            let mut candidates = aliases
+                .iter()
+                .flat_map(|alias| &alias.prefer)
+                .chain(aliases.iter().rev().flat_map(|alias| &alias.accept))
+                .chain(aliases.iter().flat_map(|alias| &alias.default))
+                .peekable();
+            let first = candidates.peek().cloned();
+            candidates
+                .find(|name| db.has_family(name))
+                .or(first)
+                .cloned()
+        };
 
-        true
+        if let Some(name) = resolve(self, &["serif"]) {
+            self.family_serif = name;
+        }
+        if let Some(name) = resolve(self, &["sans-serif", "sans serif"]) {
+            self.family_sans_serif = name;
+        }
+        if let Some(name) = resolve(self, &["monospace"]) {
+            self.family_monospace = name;
+        }
+        if let Some(name) = resolve(self, &["cursive"]) {
+            self.family_cursive = name;
+        }
+        if let Some(name) = resolve(self, &["fantasy"]) {
+            self.family_fantasy = name;
+        }
+    }
+
+    #[cfg(all(
+        unix,
+        feature = "fontconfig",
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    fn has_family(&self, name: &str) -> bool {
+        self.faces
+            .iter()
+            .any(|(_, face)| face.families.iter().any(|family| family.0 == name))
     }
 
     /// Pushes a user-provided `FaceInfo` to the database.

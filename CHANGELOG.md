@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- On Linux, a generic family is the first installed family that fontconfig prefers for it.
+  It used to be the first family of the last fontconfig alias, which may not be installed or be a symbol font.
 
 ## [0.24.0] - 2026-07-29
 ### Added
