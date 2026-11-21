@@ -269,6 +269,7 @@ impl Database {
     fn load_font_file_impl(&mut self, path: &std::path::Path) -> Result<(), std::io::Error> {
         let file = std::fs::File::open(path)?;
         let data: &[u8] = unsafe { &memmap2::MmapOptions::new().map(&file)? };
+        madvise_random(data);
 
         self.load_fonts_from_file(path, data);
         Ok(())
@@ -898,6 +899,28 @@ impl core::fmt::Debug for Source {
     }
 }
 
+
+/// Marks a font mapping as random access.
+///
+/// Font face tables (name, cmap, fvar) are read at scattered offsets, not
+/// sequentially. With a large readahead (btrfs defaults to 4 MiB) each
+/// scattered fault pulls megabytes instead of the few KiB actually touched,
+/// which is very visible when thousands of installed faces are probed.
+#[cfg(all(feature = "fs", feature = "memmap", target_os = "linux"))]
+fn madvise_random(data: &[u8]) {
+    unsafe extern "C" {
+        fn madvise(addr: *mut core::ffi::c_void, len: usize, advice: i32) -> i32;
+    }
+    // MADV_RANDOM (1) on Linux. Best-effort: a failed hint is harmless.
+    unsafe {
+        madvise(data.as_ptr() as *mut core::ffi::c_void, data.len(), 1);
+    }
+}
+
+/// No-op on non-Linux platforms.
+#[cfg(all(feature = "fs", feature = "memmap", not(target_os = "linux")))]
+fn madvise_random(_: &[u8]) {}
+
 impl Source {
     fn with_data<P, T>(&self, p: P) -> Option<T>
     where
@@ -914,6 +937,7 @@ impl Source {
             Source::File(ref path) => {
                 let file = std::fs::File::open(path).ok()?;
                 let data = unsafe { &memmap2::MmapOptions::new().map(&file).ok()? };
+                madvise_random(data);
 
                 Some(p(data))
             }
